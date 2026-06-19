@@ -18,6 +18,7 @@ export function WorkspaceProvider({ children }) {
     const { data: mems } = await supabase
       .from('memberships')
       .select('role, workspaces(id,name)')
+      .eq('user_id', user.id)
     const list = (mems ?? [])
       .filter((m) => m.workspaces)
       .map((m) => ({ id: m.workspaces.id, name: m.workspaces.name, role: m.role }))
