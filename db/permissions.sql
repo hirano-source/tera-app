@@ -49,3 +49,27 @@ create policy tasks_update on tasks for update
   with check (workspace_id in (select my_workspace_ids()));
 create policy tasks_delete on tasks for delete
   using (is_workspace_admin(workspace_id));
+
+-- ── 役職の変更（メンバー画面から owner/admin が実行）──
+-- owner/admin のみ呼べる。owner の役職は不可侵、付与できるのは admin/member のみ。
+-- ＝最後のオーナーが消える/自分をロックアウトする事故を構造的に防ぐ。
+create or replace function set_member_role(p_workspace_id uuid, p_user_id uuid, p_role role)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_caller role; v_target role;
+begin
+  select role into v_caller from memberships
+    where workspace_id = p_workspace_id and user_id = auth.uid();
+  if v_caller is null or v_caller not in ('owner','admin') then
+    raise exception 'not authorized';
+  end if;
+
+  select role into v_target from memberships
+    where workspace_id = p_workspace_id and user_id = p_user_id;
+  if v_target is null then raise exception 'member not found'; end if;
+  if v_target = 'owner' then raise exception 'cannot change owner role'; end if;
+  if p_role not in ('admin','member') then raise exception 'role must be admin or member'; end if;
+
+  update memberships set role = p_role
+    where workspace_id = p_workspace_id and user_id = p_user_id;
+end $$;
+grant execute on function set_member_role(uuid, uuid, role) to authenticated;

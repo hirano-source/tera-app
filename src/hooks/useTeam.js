@@ -105,5 +105,20 @@ export function useTeam() {
     await load()
   }
 
-  return { members, loading, error, reload: load, assignTask }
+  // 役職変更（owner/admin のみ。RPC側で権限チェック＋owner保護）
+  const setRole = async (memberId, role) => {
+    if (!currentId) return
+    const { error } = await supabase.rpc('set_member_role', {
+      p_workspace_id: currentId,
+      p_user_id: memberId,
+      p_role: role,
+    })
+    if (error) {
+      alert('役職の変更に失敗しました: ' + error.message)
+      return
+    }
+    await load()
+  }
+
+  return { members, loading, error, reload: load, assignTask, setRole }
 }

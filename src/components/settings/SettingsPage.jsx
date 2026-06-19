@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Settings, User, Building2, Plug, LogOut, Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Settings, User, Building2, Plug, LogOut, Check, ChevronRight } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../utils/supabaseClient'
@@ -59,8 +60,15 @@ export default function SettingsPage() {
       <Section icon={Building2} title="事業">
         <p className="text-sm text-zinc-700">{current?.name ?? '—'}</p>
         <p className="mt-1 text-xs text-zinc-400">
-          事業の切替・追加は上部バーから、メンバーの招待は「メンバー」画面から行えます。
+          事業の切替・追加は上部バーから行えます。
         </p>
+        <Link
+          to="/members"
+          className="mt-3 inline-flex items-center gap-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+        >
+          メンバー・権限を管理
+          <ChevronRight className="h-4 w-4" />
+        </Link>
       </Section>
 
       {/* MCP */}
