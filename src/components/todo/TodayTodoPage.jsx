@@ -47,9 +47,6 @@ export default function TodayTodoPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold">今日のToDo</h1>
-            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-              Beta
-            </span>
             <button
               onClick={() => setAddingTask((v) => !v)}
               className="text-zinc-400 hover:text-zinc-600"
