@@ -9,7 +9,7 @@ import teraSymbol from '../../assets/TERA_Symbol_Nega.png'
 export default function Sidebar({ user }) {
   const { signOut } = useAuth()
   return (
-    <nav className="flex h-full w-[88px] shrink-0 flex-col items-center bg-sidebar py-3 text-white">
+    <nav className="hidden h-full w-[88px] shrink-0 flex-col items-center bg-sidebar py-3 text-white md:flex">
       {/* ロゴ */}
       <div className="mb-5 mt-1 flex h-12 w-full items-center justify-center">
         <img src={teraSymbol} alt="TERA" className="w-12 object-contain" />

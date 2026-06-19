@@ -28,7 +28,11 @@ export default function TopBar() {
   }
 
   return (
-    <header className="flex h-[60px] shrink-0 items-center gap-3 px-4">
+    <header
+      className="flex shrink-0 flex-col"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      <div className="flex h-[60px] items-center gap-3 px-4">
       {/* 左: ワークスペース切替 */}
       <div className="relative shrink-0">
         <button
@@ -96,6 +100,7 @@ export default function TopBar() {
       {/* 中央: 検索 */}
       <div className="flex flex-1 justify-center px-3">
         <SearchBox />
+      </div>
       </div>
     </header>
   )
