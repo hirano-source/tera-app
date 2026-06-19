@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "addness": {
+      "command": "node",
+      "args": ["/Users/pesangolf/事業管理アプリ/mcp/server.js"]
+    }
+  }
+}
