@@ -6,7 +6,15 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import * as supa from './supa.js'
 
-const server = new McpServer({ name: 'tera', version: '0.2.0' })
+// 接続時にClaudeへ常時渡る運用指示（「おはよう、仕事しよう」を起動コマンドにする配線）。
+// 理念/メソッドは別途まとめてから追記する想定。ここは操作手順のみ。
+const INSTRUCTIONS = `TERA（目標達成型タスク管理）のMCP。コネクターは利用者本人として動作し、権限はサーバ側RLSで保証される。
+
+「おはよう」「仕事しよう」など作業開始の合図を受けたら、まず get_context / list_tasks({todayOnly:true}) / list_goals を呼んで「現在の事業・今日のToDo・ゴール階層」を把握し、今日やるべきことを簡潔に提示すること。
+
+タスクは create_task / update_task、ゴールは create_goal で操作。権限の無い操作はサーバが拒否する。`
+
+const server = new McpServer({ name: 'tera', version: '0.2.0' }, { instructions: INSTRUCTIONS })
 
 const text = (data) => ({ content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] })
 const fail = (e) => ({ content: [{ type: 'text', text: `エラー: ${e.message}` }], isError: true })
