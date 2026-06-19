@@ -12,6 +12,10 @@ export default function SettingsPage() {
   const [name, setName] = useState(user.name || '')
   const [saved, setSaved] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  // ホスト版MCPの公開URL（Claudeのカスタムコネクターに貼る）。env から導出。
+  const mcpUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mcp`
 
   const saveName = async () => {
     if (!name.trim() || !user.id) return
@@ -19,6 +23,12 @@ export default function SettingsPage() {
     await reload()
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
+  }
+
+  const copyMcpUrl = async () => {
+    await navigator.clipboard.writeText(mcpUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -47,11 +57,11 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      {/* ワークスペース */}
-      <Section icon={Building2} title="ワークスペース">
+      {/* 事業 */}
+      <Section icon={Building2} title="事業">
         <p className="text-sm text-zinc-700">{current?.name ?? '—'}</p>
         <p className="mt-1 text-xs text-zinc-400">
-          メンバーの招待は「メンバー」画面から行えます。
+          事業の切替・追加は上部バーから、メンバーの招待は「メンバー」画面から行えます。
         </p>
       </Section>
 
@@ -68,9 +78,31 @@ export default function SettingsPage() {
       {/* MCP */}
       <Section icon={Plug} title="Claude連携（MCP）">
         <p className="text-sm text-zinc-600">
-          ローカルのClaude Codeから「話すだけで仕事が終わる」を使えます。
+          Claudeから「話すだけで仕事が終わる」を使えます。
         </p>
-        <p className="mt-1 text-xs text-zinc-400">
+
+        {/* ホスト版（カスタムコネクター） */}
+        <p className="mt-4 text-sm font-semibold text-zinc-700">
+          Claudeデスクトップ / web
+        </p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Claudeのカスタムコネクターに下記URLを貼り、ログイン＆「許可」するだけ。
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <code className="flex-1 truncate rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-700">
+            {mcpUrl}
+          </code>
+          <button
+            onClick={copyMcpUrl}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+          >
+            {copied ? <Check className="h-4 w-4 text-brand" /> : 'コピー'}
+          </button>
+        </div>
+
+        {/* ローカル版（Claude Code） */}
+        <p className="mt-4 text-sm font-semibold text-zinc-700">Claude Code（ローカル）</p>
+        <p className="mt-1 text-xs text-zinc-500">
           プロジェクトの <code className="rounded bg-zinc-100 px-1">.env</code> にログインを設定し、Claude Codeを再起動 → 「おはよう、仕事しよう」。
         </p>
       </Section>
