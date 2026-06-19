@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Search, ChevronDown, Check, Plus } from 'lucide-react'
+import { ChevronDown, Check, Plus } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
+import SearchBox from './SearchBox'
 
 // 上部バー（ダーク）。左に事業（ワークスペース）切替、中央に検索、右にポイント。
 export default function TopBar() {
@@ -93,11 +94,8 @@ export default function TopBar() {
       </div>
 
       {/* 中央: 検索 */}
-      <div className="flex flex-1 justify-center">
-        <div className="flex w-full max-w-[640px] items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-zinc-300">
-          <Search className="h-4 w-4" />
-          <span className="text-sm">検索</span>
-        </div>
+      <div className="flex flex-1 justify-center px-3">
+        <SearchBox />
       </div>
     </header>
   )

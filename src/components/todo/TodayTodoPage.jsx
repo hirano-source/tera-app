@@ -1,12 +1,5 @@
 import { useState } from 'react'
-import {
-  Plus,
-  RotateCcw,
-  Settings2,
-  HelpCircle,
-  Lightbulb,
-  Check,
-} from 'lucide-react'
+import { Plus, Settings2, HelpCircle, Check } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import GoalTree from '../goals/GoalTree'
@@ -49,12 +42,6 @@ export default function TodayTodoPage() {
               className="text-zinc-400 hover:text-zinc-600"
             >
               <Plus className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-zinc-400">
-            <button className="flex items-center gap-1.5 hover:text-zinc-600">
-              <RotateCcw className="h-4 w-4" />
-              今日のToDoを選び直す
             </button>
           </div>
         </div>
@@ -151,11 +138,6 @@ export default function TodayTodoPage() {
           <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
         </div>
       </section>
-
-      {/* ヒント（右下フローティング） */}
-      <button className="fixed bottom-6 right-6 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-amber-500 shadow-md hover:bg-zinc-50">
-        <Lightbulb className="h-5 w-5" />
-      </button>
     </div>
   )
 }
