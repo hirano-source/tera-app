@@ -17,7 +17,7 @@ begin
             coalesce(new.raw_user_meta_data->>'name', split_part(new.email,'@',1)),
             new.email);
 
-  insert into public.workspaces (name) values ('マイワークスペース') returning id into wid;
+  insert into public.workspaces (name) values ('マイ事業') returning id into wid;
   insert into public.memberships (workspace_id, user_id, role) values (wid, new.id, 'owner');
 
   return new;
