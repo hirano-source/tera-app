@@ -44,6 +44,15 @@ export function WorkspaceProvider({ children }) {
     localStorage.setItem('ws', id)
   }
 
+  // 新しい事業（ワークスペース）を作り、その事業に切り替える。
+  const createBusiness = async (name) => {
+    const { data: id, error } = await supabase.rpc('create_business', { p_name: name })
+    if (error) throw error
+    await reload()
+    setCurrent(id)
+    return id
+  }
+
   const current = workspaces.find((w) => w.id === currentId) ?? null
   const display = profile ?? { name: user?.email ?? '', avatar_color: '#6d5dfc' }
 
@@ -52,6 +61,7 @@ export function WorkspaceProvider({ children }) {
     current,
     currentId,
     setCurrent,
+    createBusiness,
     reload,
     user: {
       id: profile?.id,
