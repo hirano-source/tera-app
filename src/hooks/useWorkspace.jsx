@@ -53,6 +53,15 @@ export function WorkspaceProvider({ children }) {
     return id
   }
 
+  // 事業（ワークスペース）を削除する。owner限定・最後の1事業は不可（RPC側で保証）。
+  // 子データは on delete cascade で一緒に消える。現在の事業を消したら別へ切替。
+  const deleteBusiness = async (id) => {
+    const { error } = await supabase.rpc('delete_business', { p_workspace_id: id })
+    if (error) throw error
+    if (currentId === id) localStorage.removeItem('ws')
+    await reload()
+  }
+
   const current = workspaces.find((w) => w.id === currentId) ?? null
   const display = profile ?? { name: user?.email ?? '', avatar_color: '#6d5dfc' }
 
@@ -62,6 +71,7 @@ export function WorkspaceProvider({ children }) {
     currentId,
     setCurrent,
     createBusiness,
+    deleteBusiness,
     reload,
     user: {
       id: profile?.id,
