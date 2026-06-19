@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Settings, User, Building2, CalendarDays, Plug, LogOut, Check } from 'lucide-react'
+import { Settings, User, Building2, Plug, LogOut, Check } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../utils/supabaseClient'
-import CalendarLinkModal from '../calendar/CalendarLinkModal'
 
 // 設定 画面 (/settings)。プロフィール・ワークスペース・連携・ログアウト。
 export default function SettingsPage() {
@@ -11,7 +10,6 @@ export default function SettingsPage() {
   const { signOut } = useAuth()
   const [name, setName] = useState(user.name || '')
   const [saved, setSaved] = useState(false)
-  const [calendarOpen, setCalendarOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   // ホスト版MCPの公開URL（Claudeのカスタムコネクターに貼る）。env から導出。
@@ -65,16 +63,6 @@ export default function SettingsPage() {
         </p>
       </Section>
 
-      {/* 連携 */}
-      <Section icon={CalendarDays} title="カレンダー連携">
-        <button
-          onClick={() => setCalendarOpen(true)}
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-50"
-        >
-          iCal / ICS URL を登録
-        </button>
-      </Section>
-
       {/* MCP */}
       <Section icon={Plug} title="Claude連携（MCP）">
         <p className="text-sm text-zinc-600">
@@ -117,8 +105,6 @@ export default function SettingsPage() {
           ログアウト
         </button>
       </div>
-
-      <CalendarLinkModal open={calendarOpen} onClose={() => setCalendarOpen(false)} />
     </div>
   )
 }

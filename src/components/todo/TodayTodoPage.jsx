@@ -4,14 +4,12 @@ import {
   RotateCcw,
   Settings2,
   HelpCircle,
-  CalendarDays,
   Lightbulb,
   Check,
 } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import GoalTree from '../goals/GoalTree'
-import CalendarLinkModal from '../calendar/CalendarLinkModal'
 import MicButton from '../common/MicButton'
 
 // 今日のToDo 画面 (/todo)。
@@ -25,7 +23,6 @@ export default function TodayTodoPage() {
     toggleTask: toggleGoalTask,
     assignOwner,
   } = useGoalTree()
-  const [calendarOpen, setCalendarOpen] = useState(false)
   const [addingTask, setAddingTask] = useState(false)
   const [taskText, setTaskText] = useState('')
   const [goalText, setGoalText] = useState('')
@@ -55,13 +52,6 @@ export default function TodayTodoPage() {
             </button>
           </div>
           <div className="flex items-center gap-4 text-sm text-zinc-400">
-            <button
-              onClick={() => setCalendarOpen(true)}
-              className="flex items-center gap-1.5 hover:text-zinc-600"
-            >
-              <CalendarDays className="h-4 w-4" />
-              カレンダー連携
-            </button>
             <button className="flex items-center gap-1.5 hover:text-zinc-600">
               <RotateCcw className="h-4 w-4" />
               今日のToDoを選び直す
@@ -166,11 +156,6 @@ export default function TodayTodoPage() {
       <button className="fixed bottom-6 right-6 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-amber-500 shadow-md hover:bg-zinc-50">
         <Lightbulb className="h-5 w-5" />
       </button>
-
-      <CalendarLinkModal
-        open={calendarOpen}
-        onClose={() => setCalendarOpen(false)}
-      />
     </div>
   )
 }
