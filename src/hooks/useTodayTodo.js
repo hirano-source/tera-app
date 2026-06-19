@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../utils/supabaseClient'
 import { useWorkspace } from './useWorkspace'
 
@@ -10,24 +10,21 @@ export function useTodayTodo() {
   const [todos, setTodos] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!currentId) return
-    let active = true
-    supabase
+    const { data } = await supabase
       .from('tasks')
       .select('*')
       .eq('workspace_id', currentId)
       .eq('is_today', true)
       .order('created_at', { ascending: true })
-      .then(({ data }) => {
-        if (!active) return
-        setTodos(data ?? [])
-        setLoading(false)
-      })
-    return () => {
-      active = false
-    }
+    setTodos(data ?? [])
+    setLoading(false)
   }, [currentId])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   // 完了/未完了の切替（楽観的更新）
   const toggleTask = async (task) => {
@@ -60,5 +57,6 @@ export function useTodayTodo() {
     loading,
     toggleTask,
     addTask,
+    reload: load,
   }
 }

@@ -82,7 +82,8 @@ export async function listGoals(ctx: Ctx) {
 
 export async function listTasks(ctx: Ctx, { todayOnly = false, mine = false } = {}) {
   let q = ctx.db.from('tasks')
-    .select('id,title,status,assignee_id,is_today').eq('workspace_id', ctx.workspaceId)
+    .select('id,title,status,assignee_id,is_today,goal_id,priority,due_date,start_due_date,completion_criteria,approach,recurrence,blocker_type,blocker_owner,blocker_since,blocker_note')
+    .eq('workspace_id', ctx.workspaceId)
   if (todayOnly) q = q.eq('is_today', true)
   if (mine) q = q.eq('assignee_id', ctx.userId)
   const { data } = await q.order('created_at')
@@ -114,25 +115,61 @@ export async function createGoal(ctx: Ctx, { title, parentId = null }: { title: 
   return data
 }
 
+type TaskFields = {
+  goalId?: string | null
+  priority?: string
+  dueDate?: string | null
+  startDueDate?: string | null
+  completionCriteria?: string
+  approach?: string
+  recurrence?: string | null
+}
+
+// camelCase の追加項目を tasks の列(snake_case)に詰める共通処理。
+function applyTaskFields(row: Record<string, unknown>, a: TaskFields) {
+  if (a.goalId !== undefined) row.goal_id = a.goalId
+  if (a.priority !== undefined) row.priority = a.priority
+  if (a.dueDate !== undefined) row.due_date = a.dueDate
+  if (a.startDueDate !== undefined) row.start_due_date = a.startDueDate
+  if (a.completionCriteria !== undefined) row.completion_criteria = a.completionCriteria
+  if (a.approach !== undefined) row.approach = a.approach
+  if (a.recurrence !== undefined) row.recurrence = a.recurrence
+}
+
 export async function createTask(
   ctx: Ctx,
-  { title, assigneeId = null, isToday = true }: { title: string; assigneeId?: string | null; isToday?: boolean },
+  a: { title: string; assigneeId?: string | null; isToday?: boolean } & TaskFields,
 ) {
-  const { data, error } = await ctx.db.from('tasks')
-    .insert({ workspace_id: ctx.workspaceId, assignee_id: assigneeId ?? ctx.userId, title, is_today: isToday, for_date: today(), source: 'manual' })
-    .select().single()
+  const row: Record<string, unknown> = {
+    workspace_id: ctx.workspaceId,
+    assignee_id: a.assigneeId ?? ctx.userId,
+    title: a.title,
+    is_today: a.isToday ?? true,
+    for_date: today(),
+    source: a.goalId ? 'goal' : 'manual',
+  }
+  applyTaskFields(row, a)
+  const { data, error } = await ctx.db.from('tasks').insert(row).select().single()
   if (error) throw new Error(error.message)
   return data
 }
 
 export async function updateTask(
   ctx: Ctx,
-  { taskId, status, title }: { taskId: string; status?: string; title?: string },
+  a: { taskId: string; status?: string; title?: string } & TaskFields & {
+    blockerType?: string; blockerOwner?: string; blockerNote?: string
+  },
 ) {
   const patch: Record<string, unknown> = {}
-  if (status !== undefined) patch.status = status
-  if (title !== undefined) patch.title = title
-  const { data, error } = await ctx.db.from('tasks').update(patch).eq('id', taskId).select().maybeSingle()
+  if (a.status !== undefined) patch.status = a.status
+  if (a.title !== undefined) patch.title = a.title
+  applyTaskFields(patch, a)
+  if (a.blockerType !== undefined) patch.blocker_type = a.blockerType
+  if (a.blockerOwner !== undefined) patch.blocker_owner = a.blockerOwner
+  if (a.blockerNote !== undefined) patch.blocker_note = a.blockerNote
+  // 「待ち」にしたら詰まり始め時刻を記録（3日で黄/7日で赤の判定に使う）
+  if (a.status === 'blocked') patch.blocker_since = new Date().toISOString()
+  const { data, error } = await ctx.db.from('tasks').update(patch).eq('id', a.taskId).select().maybeSingle()
   if (error) throw new Error(error.message)
   return data
 }

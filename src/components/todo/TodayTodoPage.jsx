@@ -5,12 +5,13 @@ import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import GoalTree from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
+import TaskDetailModal from '../tasks/TaskDetailModal'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
   const { current } = useWorkspace()
   const canEditGoals = ['owner', 'admin'].includes(current?.role)
-  const { todos, toggleTask, addTask } = useTodayTodo()
+  const { todos, toggleTask, addTask, reload: reloadTodos } = useTodayTodo()
   const {
     tree,
     users,
@@ -18,10 +19,12 @@ export default function TodayTodoPage() {
     addTask: addGoalTask,
     toggleTask: toggleGoalTask,
     assignOwner,
+    reload: reloadTree,
   } = useGoalTree()
   const [addingTask, setAddingTask] = useState(false)
   const [taskText, setTaskText] = useState('')
   const [goalText, setGoalText] = useState('')
+  const [openTaskId, setOpenTaskId] = useState(null)
 
   const submitTask = async () => {
     await addTask(taskText)
@@ -69,15 +72,15 @@ export default function TodayTodoPage() {
                 >
                   {todo.status === 'done' && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                 </button>
-                <span
+                <button
+                  onClick={() => setOpenTaskId(todo.id)}
                   className={
-                    todo.status === 'done'
-                      ? 'text-zinc-400 line-through'
-                      : 'text-zinc-700'
+                    'flex-1 truncate text-left hover:underline ' +
+                    (todo.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')
                   }
                 >
                   {todo.title}
-                </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -124,6 +127,7 @@ export default function TodayTodoPage() {
           onAddTask={addGoalTask}
           onAddGoal={createGoal}
           onAssignOwner={assignOwner}
+          onOpenTask={(node) => setOpenTaskId(node.id)}
           canEditGoals={canEditGoals}
         />
 
@@ -144,6 +148,16 @@ export default function TodayTodoPage() {
           </div>
         )}
       </section>
+
+      <TaskDetailModal
+        taskId={openTaskId}
+        open={!!openTaskId}
+        onClose={() => setOpenTaskId(null)}
+        onSaved={() => {
+          reloadTodos()
+          reloadTree()
+        }}
+      />
     </div>
   )
 }

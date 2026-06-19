@@ -12,7 +12,16 @@ const INSTRUCTIONS = `TERA（目標達成型タスク管理）のMCP。コネク
 
 「おはよう」「仕事しよう」など作業開始の合図を受けたら、まず get_context / list_tasks({todayOnly:true}) / list_goals を呼んで「現在の事業・今日のToDo・ゴール階層」を把握し、今日やるべきことを簡潔に提示すること。
 
-タスクは create_task / update_task、ゴールは create_goal で操作。権限の無い操作はサーバが拒否する。`
+タスクは create_task / update_task、ゴールは create_goal で操作。権限の無い操作はサーバが拒否する。
+
+タスクを作る/更新するときは、ただのタイトルで終わらせず、可能なら次の項目まで一緒に提案して埋めること（これがTERAの肝）：
+- priority（P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか）
+- completionCriteria（完了の基準＝「何ができたら完了か」を一文で）
+- approach（最初の一歩・やり方を1つ）
+- startDueDate（着手期限）/ dueDate（完了期限）
+- recurrence（毎日/毎週/毎月のルーティンなら指定。突発・1回限りの重点案件は省略）
+- goalId（関連するゴールがあれば紐づける）
+詰まったタスクは status=blocked にし、blockerType（data/approval/reply/external）・blockerOwner（誰待ち）・blockerNote を入れる。`
 
 // JSON Schema（MCPのツール入力はJSON Schemaで宣言する。server.jsのzodと同義）
 const S = {
@@ -20,9 +29,41 @@ const S = {
   listTasks: { type: 'object', properties: { todayOnly: { type: 'boolean' }, mine: { type: 'boolean' } } },
   activity: { type: 'object', properties: { limit: { type: 'number' } } },
   createGoal: { type: 'object', properties: { title: { type: 'string' }, parentId: { type: 'string' } }, required: ['title'] },
-  createTask: { type: 'object', properties: { title: { type: 'string' }, assigneeId: { type: 'string' }, isToday: { type: 'boolean' } }, required: ['title'] },
+  createTask: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      assigneeId: { type: 'string', description: '担当者のid（未指定なら自分）' },
+      isToday: { type: 'boolean', description: '今日のToDoにするか' },
+      goalId: { type: 'string', description: '紐づけるゴールのid（任意）' },
+      priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'], description: 'P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか' },
+      dueDate: { type: 'string', description: '完了期限 YYYY-MM-DD' },
+      startDueDate: { type: 'string', description: '着手期限 YYYY-MM-DD' },
+      completionCriteria: { type: 'string', description: '完了の基準（doneの定義）' },
+      approach: { type: 'string', description: '最初の一歩・やり方（1つ）' },
+      recurrence: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'ルーティンなら指定。重点案件は省略' },
+    },
+    required: ['title'],
+  },
   assign: { type: 'object', properties: { assigneeId: { type: 'string' }, title: { type: 'string' } }, required: ['assigneeId', 'title'] },
-  update: { type: 'object', properties: { taskId: { type: 'string' }, status: { type: 'string', enum: ['todo', 'doing', 'done', 'blocked'] }, title: { type: 'string' } }, required: ['taskId'] },
+  update: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string' },
+      status: { type: 'string', enum: ['todo', 'doing', 'done', 'blocked'] },
+      title: { type: 'string' },
+      priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'] },
+      dueDate: { type: 'string', description: '完了期限 YYYY-MM-DD' },
+      startDueDate: { type: 'string', description: '着手期限 YYYY-MM-DD' },
+      completionCriteria: { type: 'string' },
+      approach: { type: 'string' },
+      recurrence: { type: 'string', enum: ['daily', 'weekly', 'monthly'] },
+      blockerType: { type: 'string', enum: ['data', 'approval', 'reply', 'external'], description: '詰まりの種類' },
+      blockerOwner: { type: 'string', description: '誰待ちか' },
+      blockerNote: { type: 'string' },
+    },
+    required: ['taskId'],
+  },
   log: { type: 'object', properties: { type: { type: 'string' }, summary: { type: 'string' } }, required: ['type', 'summary'] },
 } as const
 
@@ -60,7 +101,7 @@ const TOOLS: Record<string, Tool> = {
     run: (ctx, a) => supa.createGoal(ctx, a),
   },
   create_task: {
-    description: 'タスクを作る。assigneeId 未指定なら自分担当。isToday=今日のToDo。',
+    description: 'タスクを作る。タイトルだけでなく priority/completionCriteria/approach/期限/recurrence/goalId まで埋めるのが望ましい。assigneeId 未指定なら自分担当。',
     inputSchema: S.createTask,
     run: (ctx, a) => supa.createTask(ctx, a),
   },
@@ -74,7 +115,7 @@ const TOOLS: Record<string, Tool> = {
     },
   },
   update_task: {
-    description: 'タスクの状態(todo/doing/done/blocked)やタイトルを更新する。',
+    description: 'タスクを更新する。状態(todo/doing/done/blocked)・タイトルのほか、priority/完了基準/やり方/期限/recurrence、詰まり時は blockerType/blockerOwner/blockerNote も指定できる。',
     inputSchema: S.update,
     run: (ctx, a) => supa.updateTask(ctx, a),
   },

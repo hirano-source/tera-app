@@ -8,7 +8,7 @@ import { cn } from '../../utils/cn'
 
 // スキルツリー：ゴール/タスクのノードを接続線付きで再帰表示する。
 // canEditGoals=false（メンバー）はゴールの追加・担当割当を出さない（タスクは全員可）。
-export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, canEditGoals = true }) {
+export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, canEditGoals = true }) {
   return (
     <div>
       {tree.map((node) => (
@@ -21,6 +21,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
           onAddTask={onAddTask}
           onAddGoal={onAddGoal}
           onAssignOwner={onAssignOwner}
+          onOpenTask={onOpenTask}
           canEditGoals={canEditGoals}
         />
       ))}
@@ -28,7 +29,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
   )
 }
 
-function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner, canEditGoals }) {
+function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, canEditGoals }) {
   const navigate = useNavigate()
   const isGoal = node.kind === 'goal'
   const children = node.children ?? []
@@ -149,6 +150,15 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             </ToolButton>
           </div>
         )}
+
+        {/* タスク：ホバーで詳細を開く */}
+        {!isGoal && onOpenTask && (
+          <div className="opacity-0 transition-opacity group-hover:opacity-100">
+            <ToolButton title="詳細を開く" onClick={() => onOpenTask(node)}>
+              <Maximize2 className="h-4 w-4" />
+            </ToolButton>
+          </div>
+        )}
       </div>
 
       {/* 子（接続線つき） */}
@@ -164,6 +174,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
               onAddTask={onAddTask}
               onAddGoal={onAddGoal}
               onAssignOwner={onAssignOwner}
+              onOpenTask={onOpenTask}
               canEditGoals={canEditGoals}
             />
           ))}
