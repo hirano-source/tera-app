@@ -102,6 +102,15 @@ export function useTeam() {
       type: 'task_assigned',
       summary: `タスクを割り当て: ${text}`,
     })
+    // 割り当てられた本人へ通知（自分自身への割当は通知しない）
+    if (memberId !== user?.id) {
+      await supabase.from('notifications').insert({
+        workspace_id: currentId,
+        user_id: memberId,
+        type: 'task_assigned',
+        payload: { title: text, by: user?.name ?? null },
+      })
+    }
     await load()
   }
 
