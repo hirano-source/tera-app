@@ -5,30 +5,32 @@ import {
   Sparkles,
   Settings2,
   HelpCircle,
-  Play,
-  MoreHorizontal,
-  LogIn,
   CalendarDays,
   X,
   Lightbulb,
   Check,
 } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
-import { useGoals } from '../../hooks/useGoals'
+import { useGoalTree } from '../../hooks/useGoalTree'
+import GoalTree from '../goals/GoalTree'
 import CalendarLinkModal from '../calendar/CalendarLinkModal'
 import MicButton from '../common/MicButton'
-import { useNavigate } from 'react-router-dom'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
   const { todos, claudeMessage, toggleTask, addTask } = useTodayTodo()
-  const { topGoals, createGoal } = useGoals()
+  const {
+    tree,
+    users,
+    createGoal,
+    addTask: addGoalTask,
+    toggleTask: toggleGoalTask,
+  } = useGoalTree()
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [toastOpen, setToastOpen] = useState(true)
   const [addingTask, setAddingTask] = useState(false)
   const [taskText, setTaskText] = useState('')
   const [goalText, setGoalText] = useState('')
-  const navigate = useNavigate()
 
   const submitTask = async () => {
     await addTask(taskText)
@@ -148,44 +150,28 @@ export default function TodayTodoPage() {
 
         <hr className="my-4 border-zinc-200" />
 
-        <ul className="space-y-1">
-          {topGoals.map((goal) => (
-            <li
-              key={goal.id}
-              className="group flex items-center justify-between rounded-lg px-2 py-3 hover:bg-zinc-50"
-            >
-              <button
-                onClick={() => navigate(`/goals/${goal.id}`)}
-                className="flex items-center gap-4 text-left"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-white">
-                  <Play className="h-5 w-5 translate-x-0.5 fill-white" />
-                </span>
-                <span className="text-zinc-700">{goal.title}</span>
-              </button>
-              <div className="flex items-center gap-3 text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100">
-                <Plus className="h-5 w-5 hover:text-zinc-500" />
-                <MoreHorizontal className="h-5 w-5 hover:text-zinc-500" />
-                <LogIn className="h-5 w-5 hover:text-zinc-500" />
-              </div>
-            </li>
-          ))}
+        {/* スキルツリー（ゴール階層） */}
+        <GoalTree
+          tree={tree}
+          users={users}
+          onToggleTask={toggleGoalTask}
+          onAddTask={addGoalTask}
+        />
 
-          {/* ゴール作成の入力行 */}
-          <li className="flex items-center gap-4 rounded-lg px-2 py-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-white">
-              <Play className="h-5 w-5 translate-x-0.5 fill-white" />
-            </span>
-            <input
-              value={goalText}
-              onChange={(e) => setGoalText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submitGoal()}
-              placeholder="達成したいゴールを入力して Enter"
-              className="flex-1 bg-transparent text-zinc-700 outline-none placeholder:text-zinc-400"
-            />
-            <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
-          </li>
-        </ul>
+        {/* ゴール作成の入力行 */}
+        <div className="mt-1 flex items-center gap-3 rounded-lg py-2 pl-7 pr-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+            <Plus className="h-4 w-4" />
+          </span>
+          <input
+            value={goalText}
+            onChange={(e) => setGoalText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submitGoal()}
+            placeholder="達成したいゴールを入力して Enter"
+            className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
+          />
+          <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
+        </div>
       </section>
 
       {/* Claudeトースト（右下） */}
