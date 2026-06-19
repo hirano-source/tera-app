@@ -60,6 +60,5 @@ export function useTodayTodo() {
     loading,
     toggleTask,
     addTask,
-    claudeMessage: 'Claudeが今日のゴールから問いを用意しました',
   }
 }

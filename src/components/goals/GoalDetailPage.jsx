@@ -1,6 +1,5 @@
 import { useParams } from 'react-router-dom'
 import {
-  Sparkles,
   ChevronDown,
   Plus,
   Headphones,
@@ -59,11 +58,6 @@ export default function GoalDetailPage() {
 
       {/* アクションバー */}
       <div className="flex items-center gap-2 text-sm">
-        <button className="flex items-center gap-1.5 rounded-lg border border-claude/40 px-3 py-1.5 font-medium text-claude hover:bg-claude/5">
-          <Sparkles className="h-4 w-4" />
-          ゴールについて相談
-          <ChevronDown className="h-4 w-4" />
-        </button>
         <button className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-zinc-600 hover:bg-zinc-100">
           <Plus className="h-4 w-4" />
           現状

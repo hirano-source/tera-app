@@ -2,11 +2,9 @@ import { useState } from 'react'
 import {
   Plus,
   RotateCcw,
-  Sparkles,
   Settings2,
   HelpCircle,
   CalendarDays,
-  X,
   Lightbulb,
   Check,
 } from 'lucide-react'
@@ -18,7 +16,7 @@ import MicButton from '../common/MicButton'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
-  const { todos, claudeMessage, toggleTask, addTask } = useTodayTodo()
+  const { todos, toggleTask, addTask } = useTodayTodo()
   const {
     tree,
     users,
@@ -28,7 +26,6 @@ export default function TodayTodoPage() {
     assignOwner,
   } = useGoalTree()
   const [calendarOpen, setCalendarOpen] = useState(false)
-  const [toastOpen, setToastOpen] = useState(true)
   const [addingTask, setAddingTask] = useState(false)
   const [taskText, setTaskText] = useState('')
   const [goalText, setGoalText] = useState('')
@@ -124,11 +121,6 @@ export default function TodayTodoPage() {
             <MicButton onText={(t) => setTaskText((p) => (p ? p + ' ' : '') + t)} />
           </div>
         )}
-
-        <button className="flex items-center gap-2 py-2 font-medium text-claude hover:opacity-80">
-          <Sparkles className="h-5 w-5" />
-          Claudeと今日のToDoを決める
-        </button>
       </section>
 
       {/* === 今やるべきゴール === */}
@@ -136,10 +128,6 @@ export default function TodayTodoPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">今やるべきゴール</h2>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-1.5 rounded-full border border-claude/40 px-3 py-1.5 text-sm font-medium text-claude hover:bg-claude/5">
-              <Sparkles className="h-4 w-4" />
-              Claudeに相談
-            </button>
             <button className="text-zinc-400 hover:text-zinc-600">
               <Settings2 className="h-5 w-5" />
             </button>
@@ -176,16 +164,6 @@ export default function TodayTodoPage() {
           <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
         </div>
       </section>
-
-      {/* Claudeトースト（右下） */}
-      {toastOpen && (
-        <div className="fixed bottom-6 right-20 flex items-center gap-3 rounded-lg bg-brand px-4 py-3 text-sm font-medium text-white shadow-lg">
-          {claudeMessage}
-          <button onClick={() => setToastOpen(false)}>
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* ヒント（右下フローティング） */}
       <button className="fixed bottom-6 right-6 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-amber-500 shadow-md hover:bg-zinc-50">
