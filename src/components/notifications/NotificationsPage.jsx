@@ -9,9 +9,9 @@ export default function NotificationsPage() {
   const [tab, setTab] = useState('すべて')
 
   return (
-    <div className="flex h-full gap-4 bg-zinc-50 p-4">
-      {/* 左: 一覧 */}
-      <section className="flex w-[420px] shrink-0 flex-col">
+    <div className="flex h-full flex-col gap-4 bg-zinc-50 p-4 sm:flex-row">
+      {/* 左: 一覧。モバイルは縦積み */}
+      <section className="flex w-full shrink-0 flex-col sm:w-[420px]">
         <div className="flex items-center gap-2">
           <div className="flex rounded-full bg-zinc-200/70 p-0.5 text-sm">
             {['未読', 'すべて'].map((t) => (

@@ -8,7 +8,7 @@ export default function GoalsListPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="mx-auto max-w-[1000px] px-10 py-8">
+    <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-10 sm:py-8">
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-xl font-bold">
           <Target className="h-6 w-6" />

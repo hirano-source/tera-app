@@ -31,7 +31,7 @@ export default function GoalDetailPage() {
   }
 
   return (
-    <div className="relative mx-auto max-w-[1280px] px-8 py-5">
+    <div className="relative mx-auto max-w-[1280px] px-4 py-5 sm:px-8">
       {/* ツールバー */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

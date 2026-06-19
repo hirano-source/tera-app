@@ -31,7 +31,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[760px] px-10 py-8">
+    <div className="mx-auto max-w-[760px] px-4 py-6 sm:px-10 sm:py-8">
       <h1 className="flex items-center gap-2 text-xl font-bold">
         <Settings className="h-6 w-6" />
         設定

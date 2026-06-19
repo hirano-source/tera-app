@@ -19,9 +19,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-full">
-      {/* 左: スレッド一覧（ゴール）*/}
-      <aside className="flex w-[340px] shrink-0 flex-col border-r border-zinc-200">
+    <div className="flex h-full flex-col sm:flex-row">
+      {/* 左: スレッド一覧（ゴール）。モバイルは上に積んで高さを抑える */}
+      <aside className="flex max-h-[40vh] w-full shrink-0 flex-col border-b border-zinc-200 sm:max-h-none sm:w-[340px] sm:border-b-0 sm:border-r">
         <div className="flex items-center gap-2 px-5 py-4">
           <BookText className="h-5 w-5 text-zinc-500" />
           <h1 className="text-lg font-bold">{current?.name ?? workspace?.name}</h1>

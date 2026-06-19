@@ -34,7 +34,7 @@ export default function TodayTodoPage() {
   }
 
   return (
-    <div className="relative mx-auto max-w-[1280px] px-10 py-8">
+    <div className="relative mx-auto max-w-[1280px] px-4 py-6 sm:px-10 sm:py-8">
       {/* === 今日のToDo === */}
       <section>
         <div className="flex items-center justify-between">

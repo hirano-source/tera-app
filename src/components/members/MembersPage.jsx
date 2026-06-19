@@ -16,7 +16,7 @@ export default function MembersPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
 
   return (
-    <div className="mx-auto max-w-[1100px] px-10 py-8">
+    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-10 sm:py-8">
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-xl font-bold">
           <Users className="h-6 w-6" />
