@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Settings2, HelpCircle, Check } from 'lucide-react'
+import { Plus, Settings2, HelpCircle, Check, ChevronRight } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -75,11 +75,18 @@ export default function TodayTodoPage() {
                 <button
                   onClick={() => setOpenTaskId(todo.id)}
                   className={
-                    'flex-1 truncate text-left hover:underline ' +
+                    'flex-1 truncate text-left ' +
                     (todo.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')
                   }
                 >
                   {todo.title}
+                </button>
+                <button
+                  onClick={() => setOpenTaskId(todo.id)}
+                  title="詳細を開く"
+                  className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600"
+                >
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </li>
             ))}

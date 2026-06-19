@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Trash2 } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
+import { useWorkspace } from '../../hooks/useWorkspace'
 
 // タスクの詳細（右からのドロワー）。クリックで開き、6項目を表示／編集する。
 // 入力は基本Claude(MCP)が埋める想定だが、ここで人が直接いじることもできる。
@@ -32,6 +33,8 @@ const BLOCKER = [
 ]
 
 export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
+  const { current } = useWorkspace()
+  const canDelete = ['owner', 'admin'].includes(current?.role)
   const [t, setT] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -78,6 +81,20 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
     setBusy(false)
     if (error) {
       alert('保存に失敗しました: ' + error.message)
+      return
+    }
+    onSaved?.()
+    onClose()
+  }
+
+  const remove = async () => {
+    if (!t) return
+    if (!confirm(`タスク「${t.title}」を削除しますか？\n元に戻せません。（完了にするだけなら「保存」で状態を完了にしてください）`)) return
+    setBusy(true)
+    const { error } = await supabase.from('tasks').delete().eq('id', t.id)
+    setBusy(false)
+    if (error) {
+      alert('削除に失敗しました: ' + error.message)
       return
     }
     onSaved?.()
@@ -186,11 +203,22 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
           </div>
         )}
 
-        <div className="border-t border-zinc-200 px-5 py-3">
+        <div className="flex items-center gap-2 border-t border-zinc-200 px-5 py-3">
+          {canDelete && (
+            <button
+              onClick={remove}
+              disabled={busy || !t}
+              title="タスクを削除"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" />
+              削除
+            </button>
+          )}
           <button
             onClick={save}
             disabled={busy || !t}
-            className="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+            className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
           >
             {busy ? '保存中…' : '保存'}
           </button>

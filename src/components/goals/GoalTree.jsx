@@ -151,13 +151,11 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
           </div>
         )}
 
-        {/* タスク：ホバーで詳細を開く */}
+        {/* タスク：詳細を開く（常時表示＝スマホのタップでも届く） */}
         {!isGoal && onOpenTask && (
-          <div className="opacity-0 transition-opacity group-hover:opacity-100">
-            <ToolButton title="詳細を開く" onClick={() => onOpenTask(node)}>
-              <Maximize2 className="h-4 w-4" />
-            </ToolButton>
-          </div>
+          <ToolButton title="詳細を開く" onClick={() => onOpenTask(node)}>
+            <Maximize2 className="h-4 w-4" />
+          </ToolButton>
         )}
       </div>
 

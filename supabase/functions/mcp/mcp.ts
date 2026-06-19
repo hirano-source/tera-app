@@ -65,6 +65,7 @@ const S = {
     required: ['taskId'],
   },
   log: { type: 'object', properties: { type: { type: 'string' }, summary: { type: 'string' } }, required: ['type', 'summary'] },
+  del: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
 } as const
 
 type Tool = { description: string; inputSchema: unknown; run: (ctx: Ctx, args: any) => Promise<unknown> }
@@ -123,6 +124,11 @@ const TOOLS: Record<string, Tool> = {
     description: '活動記録を残す（後で文脈として読み戻せる）。',
     inputSchema: S.log,
     run: (ctx, a) => supa.logActivity(ctx, a),
+  },
+  delete_task: {
+    description: 'タスクを削除する（owner/adminのみ。権限が無ければ何も起きない）。完了にするだけなら update_task の status=done を使う。',
+    inputSchema: S.del,
+    run: (ctx, a) => supa.deleteTask(ctx, a),
   },
 }
 

@@ -174,6 +174,13 @@ export async function updateTask(
   return data
 }
 
+export async function deleteTask(ctx: Ctx, { taskId }: { taskId: string }) {
+  // RLSで削除は owner/admin のみ許可。権限が無ければ0件削除＝実質no-op。
+  const { error } = await ctx.db.from('tasks').delete().eq('id', taskId)
+  if (error) throw new Error(error.message)
+  return { deleted: taskId }
+}
+
 export async function logActivity(ctx: Ctx, { type, summary }: { type: string; summary: string }) {
   const { data, error } = await ctx.db.from('activities')
     .insert({ workspace_id: ctx.workspaceId, actor_id: ctx.userId, type, summary }).select().single()

@@ -73,5 +73,19 @@ export function useGoal(goalId) {
     }
   }, [goalId, currentId])
 
-  return { goal, loading }
+  // ゴールの項目を保存（現状/完了基準/期日/担当など）。owner/adminのみRLSで許可。
+  const saveGoal = async (patch) => {
+    if (!goalId) return
+    const { data, error } = await supabase
+      .from('goals')
+      .update(patch)
+      .eq('id', goalId)
+      .select()
+      .maybeSingle()
+    if (error) throw error
+    if (data) setGoal(data)
+    return data
+  }
+
+  return { goal, loading, saveGoal }
 }

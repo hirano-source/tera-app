@@ -1,18 +1,12 @@
-import { useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   ChevronDown,
   Plus,
-  Headphones,
-  Flag,
-  UserPlus,
-  MoreHorizontal,
   Search,
   ArrowUpDown,
   Upload,
-  ChevronRight,
   MessageSquare,
-  Menu,
   Download,
   Trash2,
   FileText,
@@ -23,13 +17,15 @@ import { useGoal } from '../../hooks/useGoals'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useDeliverables } from '../../hooks/useDeliverables'
 import { useComments } from '../../hooks/useComments'
+import { supabase } from '../../utils/supabaseClient'
 import { cn } from '../../utils/cn'
 
 // ゴール詳細 画面 (/goals/:id)。成果物（ファイル）とコメントが実際に動く。
 export default function GoalDetailPage() {
   const { goalId } = useParams()
-  const { goal, loading } = useGoal(goalId)
-  const { user } = useWorkspace()
+  const { goal, loading, saveGoal } = useGoal(goalId)
+  const { current, currentId } = useWorkspace()
+  const canEdit = ['owner', 'admin'].includes(current?.role)
   const { items, available, busy, upload, download, remove } = useDeliverables(goalId)
   const { comments, authors, addComment, count: commentCount, meId } = useComments('goal', goalId)
 
@@ -39,6 +35,66 @@ export default function GoalDetailPage() {
   const [dragOver, setDragOver] = useState(false)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [draft, setDraft] = useState('')
+
+  // ゴール情報（現状/完了基準/期日/担当）の編集フォーム
+  const [info, setInfo] = useState({ current: '', criteria: '', due_date: '', owner_id: '' })
+  const [members, setMembers] = useState([])
+  const [savingInfo, setSavingInfo] = useState(false)
+
+  useEffect(() => {
+    if (!goal) return
+    setInfo({
+      current: goal.current ?? '',
+      criteria: goal.criteria ?? '',
+      due_date: goal.due_date ?? '',
+      owner_id: goal.owner_id ?? '',
+    })
+  }, [goal])
+
+  // 担当ピッカー用のメンバー一覧
+  useEffect(() => {
+    if (!currentId) return
+    let active = true
+    ;(async () => {
+      const { data: mem } = await supabase
+        .from('memberships')
+        .select('user_id')
+        .eq('workspace_id', currentId)
+      const ids = (mem ?? []).map((m) => m.user_id)
+      if (ids.length === 0) {
+        if (active) setMembers([])
+        return
+      }
+      const { data: us } = await supabase.from('users').select('id,name').in('id', ids)
+      if (active) setMembers(us ?? [])
+    })()
+    return () => {
+      active = false
+    }
+  }, [currentId])
+
+  const infoDirty =
+    !!goal &&
+    ((info.current ?? '') !== (goal.current ?? '') ||
+      (info.criteria ?? '') !== (goal.criteria ?? '') ||
+      (info.due_date ?? '') !== (goal.due_date ?? '') ||
+      (info.owner_id ?? '') !== (goal.owner_id ?? ''))
+
+  const saveInfo = async () => {
+    setSavingInfo(true)
+    try {
+      await saveGoal({
+        current: info.current || '',
+        criteria: info.criteria || '',
+        due_date: info.due_date || null,
+        owner_id: info.owner_id || null,
+      })
+    } catch (e) {
+      alert('保存に失敗しました: ' + (e?.message ?? e))
+    } finally {
+      setSavingInfo(false)
+    }
+  }
 
   const shown = useMemo(() => {
     const f = items.filter((i) => i.name.toLowerCase().includes(q.trim().toLowerCase()))
@@ -74,55 +130,85 @@ export default function GoalDetailPage() {
 
   return (
     <div className="relative mx-auto max-w-[1280px] px-4 py-5 sm:px-8">
-      {/* ツールバー */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button className="text-zinc-500 hover:text-zinc-800">
-            <Menu className="h-6 w-6" />
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-2 py-1 text-sm">
-            <span
-              className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
-              style={{ backgroundColor: user.color }}
-            >
-              {user.initial}
-            </span>
-            {user.name}
-            <UserPlus className="ml-1 h-4 w-4 text-zinc-400" />
-          </span>
-          <button className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100">
-            <MoreHorizontal className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* アクションバー */}
-      <div className="flex items-center gap-2 text-sm">
-        <button className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-zinc-600 hover:bg-zinc-100">
-          <Plus className="h-4 w-4" />
-          現状
-        </button>
-        <button className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-zinc-600 hover:bg-zinc-100">
-          <Plus className="h-4 w-4" />
-          完了の基準
-        </button>
-        <button className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-zinc-600 hover:bg-zinc-100">
-          <Headphones className="h-4 w-4" />
-          ハドルを開始
-          <ChevronDown className="h-4 w-4" />
-        </button>
-        <button className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-zinc-600 hover:bg-zinc-100">
-          <Flag className="h-4 w-4" />
-          期日を設定
-        </button>
-      </div>
-
       {/* タイトル */}
-      <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50/60 px-6 py-8 text-center">
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-6 py-8 text-center">
         <h1 className="text-3xl font-bold tracking-wide">{goal.title}</h1>
       </div>
+
+      {/* ゴール情報（現状 / 完了の基準 / 期日 / 担当）。owner/adminは編集、他は閲覧 */}
+      <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <InfoField label="現状">
+            {canEdit ? (
+              <textarea
+                rows={2}
+                value={info.current}
+                onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))}
+                placeholder="今どういう状態か"
+                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+            ) : (
+              <ReadVal v={goal.current} />
+            )}
+          </InfoField>
+          <InfoField label="完了の基準">
+            {canEdit ? (
+              <textarea
+                rows={2}
+                value={info.criteria}
+                onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))}
+                placeholder="何ができたら完了か"
+                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+            ) : (
+              <ReadVal v={goal.criteria} />
+            )}
+          </InfoField>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <InfoField label="期日">
+            {canEdit ? (
+              <input
+                type="date"
+                value={info.due_date || ''}
+                onChange={(e) => setInfo((p) => ({ ...p, due_date: e.target.value }))}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+            ) : (
+              <ReadVal v={goal.due_date} />
+            )}
+          </InfoField>
+          <InfoField label="担当">
+            {canEdit ? (
+              <select
+                value={info.owner_id || ''}
+                onChange={(e) => setInfo((p) => ({ ...p, owner_id: e.target.value }))}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-zinc-500"
+              >
+                <option value="">未割当</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <ReadVal v={members.find((m) => m.id === goal.owner_id)?.name} />
+            )}
+          </InfoField>
+        </div>
+        {canEdit && infoDirty && (
+          <div className="flex justify-end">
+            <button
+              onClick={saveInfo}
+              disabled={savingInfo}
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+            >
+              {savingInfo ? '保存中…' : '保存'}
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* 成果物 */}
       <section className="mt-6">
@@ -335,4 +421,17 @@ function fmt(ts) {
   } catch {
     return ''
   }
+}
+
+function InfoField({ label, children }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-zinc-500">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function ReadVal({ v }) {
+  return <p className="whitespace-pre-wrap text-sm text-zinc-700">{v || <span className="text-zinc-400">—</span>}</p>
 }
