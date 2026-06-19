@@ -21,7 +21,9 @@ const INSTRUCTIONS = `TERA（目標達成型タスク管理）のMCP。コネク
 - startDueDate（着手期限）/ dueDate（完了期限）
 - recurrence（毎日/毎週/毎月のルーティンなら指定。突発・1回限りの重点案件は省略）
 - goalId（関連するゴールがあれば紐づける）
-詰まったタスクは status=blocked にし、blockerType（data/approval/reply/external）・blockerOwner（誰待ち）・blockerNote を入れる。`
+詰まったタスクは status=blocked にし、blockerType（data/approval/reply/external）・blockerOwner（誰待ち）・blockerNote を入れる。
+
+作業の確認・提案・議事録は add_comment でそのゴール/タスクのスレッドに残す（＝「Claudeより」。チームの文脈がそこに蓄積される）。作業前は list_comments で経緯を読むとよい。`
 
 // JSON Schema（MCPのツール入力はJSON Schemaで宣言する。server.jsのzodと同義）
 const S = {
@@ -66,6 +68,23 @@ const S = {
   },
   log: { type: 'object', properties: { type: { type: 'string' }, summary: { type: 'string' } }, required: ['type', 'summary'] },
   del: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
+  comment: {
+    type: 'object',
+    properties: {
+      targetType: { type: 'string', enum: ['goal', 'task'], description: 'コメント先の種類' },
+      targetId: { type: 'string', description: 'ゴールまたはタスクのid' },
+      body: { type: 'string' },
+    },
+    required: ['targetType', 'targetId', 'body'],
+  },
+  listComments: {
+    type: 'object',
+    properties: {
+      targetType: { type: 'string', enum: ['goal', 'task'] },
+      targetId: { type: 'string' },
+    },
+    required: ['targetType', 'targetId'],
+  },
 } as const
 
 type Tool = { description: string; inputSchema: unknown; run: (ctx: Ctx, args: any) => Promise<unknown> }
@@ -129,6 +148,16 @@ const TOOLS: Record<string, Tool> = {
     description: 'タスクを削除する（owner/adminのみ。権限が無ければ何も起きない）。完了にするだけなら update_task の status=done を使う。',
     inputSchema: S.del,
     run: (ctx, a) => supa.deleteTask(ctx, a),
+  },
+  add_comment: {
+    description: 'ゴール/タスクのスレッドにコメントを投稿する（「Claudeより」として確認・提案・議事録を残す）。チームの文脈がそのゴール/タスクに蓄積される。',
+    inputSchema: S.comment,
+    run: (ctx, a) => supa.addComment(ctx, a),
+  },
+  list_comments: {
+    description: 'ゴール/タスクのコメント（これまでの会話・会議・文脈）を取得する。作業前に読むと経緯が分かる。',
+    inputSchema: S.listComments,
+    run: (ctx, a) => supa.listComments(ctx, a),
   },
 }
 

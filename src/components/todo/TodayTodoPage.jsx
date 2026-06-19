@@ -6,6 +6,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import GoalTree from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
 import TaskDetailModal from '../tasks/TaskDetailModal'
+import TaskMeta from '../tasks/TaskMeta'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
@@ -81,6 +82,7 @@ export default function TodayTodoPage() {
                 >
                   {todo.title}
                 </button>
+                <TaskMeta task={todo} />
                 <button
                   onClick={() => setOpenTaskId(todo.id)}
                   title="詳細を開く"

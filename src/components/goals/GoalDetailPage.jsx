@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
+  ChevronRight,
   Plus,
   Search,
   ArrowUpDown,
@@ -10,36 +11,42 @@ import {
   Download,
   Trash2,
   FileText,
-  X,
-  Send,
+  Check,
+  Play,
 } from 'lucide-react'
 import { useGoal } from '../../hooks/useGoals'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useDeliverables } from '../../hooks/useDeliverables'
-import { useComments } from '../../hooks/useComments'
+import { useGoalTasks } from '../../hooks/useGoalTasks'
 import { supabase } from '../../utils/supabaseClient'
 import { cn } from '../../utils/cn'
+import CommentThread from '../comments/CommentThread'
+import TaskDetailModal from '../tasks/TaskDetailModal'
+import TaskMeta from '../tasks/TaskMeta'
 
-// ゴール詳細 画面 (/goals/:id)。成果物（ファイル）とコメントが実際に動く。
+// ゴール詳細 画面 (/goals/:id)。PC=2ペイン（左:内容／右:常駐チャット）。
+// 左: パンくず＋タイトル＋ゴール情報＋タスク＋成果物。右: コメント/会話の蓄積。
 export default function GoalDetailPage() {
   const { goalId } = useParams()
+  const navigate = useNavigate()
   const { goal, loading, saveGoal } = useGoal(goalId)
   const { current, currentId } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
   const { items, available, busy, upload, download, remove } = useDeliverables(goalId)
-  const { comments, authors, addComment, count: commentCount, meId } = useComments('goal', goalId)
+  const { tasks, addTask, toggleTask, reload: reloadTasks } = useGoalTasks(goalId)
 
   const fileRef = useRef(null)
   const [q, setQ] = useState('')
   const [asc, setAsc] = useState(true)
   const [dragOver, setDragOver] = useState(false)
-  const [commentsOpen, setCommentsOpen] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [newTask, setNewTask] = useState('')
+  const [openTaskId, setOpenTaskId] = useState(null)
 
   // ゴール情報（現状/完了基準/期日/担当）の編集フォーム
   const [info, setInfo] = useState({ current: '', criteria: '', due_date: '', owner_id: '' })
   const [members, setMembers] = useState([])
   const [savingInfo, setSavingInfo] = useState(false)
+  const [crumbs, setCrumbs] = useState([])
 
   useEffect(() => {
     if (!goal) return
@@ -51,27 +58,37 @@ export default function GoalDetailPage() {
     })
   }, [goal])
 
-  // 担当ピッカー用のメンバー一覧
+  // メンバー一覧＋パンくず（親ゴールの連なり）用に、事業のゴールとメンバーを取得
   useEffect(() => {
     if (!currentId) return
     let active = true
     ;(async () => {
-      const { data: mem } = await supabase
-        .from('memberships')
-        .select('user_id')
-        .eq('workspace_id', currentId)
+      const [{ data: mem }, { data: goals }] = await Promise.all([
+        supabase.from('memberships').select('user_id').eq('workspace_id', currentId),
+        supabase.from('goals').select('id,title,parent_id').eq('workspace_id', currentId),
+      ])
       const ids = (mem ?? []).map((m) => m.user_id)
-      if (ids.length === 0) {
-        if (active) setMembers([])
-        return
+      if (ids.length) {
+        const { data: us } = await supabase.from('users').select('id,name').in('id', ids)
+        if (active) setMembers(us ?? [])
       }
-      const { data: us } = await supabase.from('users').select('id,name').in('id', ids)
-      if (active) setMembers(us ?? [])
+      // パンくず：goalId から parent_id を辿ってルートまで
+      if (active) {
+        const map = Object.fromEntries((goals ?? []).map((g) => [g.id, g]))
+        const chain = []
+        let cur = map[goalId]
+        let guard = 0
+        while (cur && guard++ < 20) {
+          chain.unshift(cur)
+          cur = cur.parent_id ? map[cur.parent_id] : null
+        }
+        setCrumbs(chain)
+      }
     })()
     return () => {
       active = false
     }
-  }, [currentId])
+  }, [currentId, goalId])
 
   const infoDirty =
     !!goal &&
@@ -101,12 +118,10 @@ export default function GoalDetailPage() {
     return [...f].sort((a, b) => (asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)))
   }, [items, q, asc])
 
+  const doneCount = tasks.filter((t) => t.status === 'done').length
+
   if (loading || !goal) {
-    return (
-      <div className="flex h-full items-center justify-center text-zinc-400">
-        読み込み中…
-      </div>
-    )
+    return <div className="flex h-full items-center justify-center text-zinc-400">読み込み中…</div>
   }
 
   const onPick = (e) => {
@@ -121,307 +136,230 @@ export default function GoalDetailPage() {
     const f = e.dataTransfer.files?.[0]
     if (f) upload(f)
   }
-  const sendComment = async () => {
-    const v = draft.trim()
+  const submitTask = async () => {
+    const v = newTask.trim()
     if (!v) return
-    await addComment(v)
-    setDraft('')
+    await addTask(v)
+    setNewTask('')
   }
 
   return (
-    <div className="relative mx-auto max-w-[1280px] px-4 py-5 sm:px-8">
-      {/* タイトル */}
-      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-6 py-8 text-center">
-        <h1 className="text-3xl font-bold tracking-wide">{goal.title}</h1>
-      </div>
-
-      {/* ゴール情報（現状 / 完了の基準 / 期日 / 担当）。owner/adminは編集、他は閲覧 */}
-      <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InfoField label="現状">
-            {canEdit ? (
-              <textarea
-                rows={2}
-                value={info.current}
-                onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))}
-                placeholder="今どういう状態か"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            ) : (
-              <ReadVal v={goal.current} />
-            )}
-          </InfoField>
-          <InfoField label="完了の基準">
-            {canEdit ? (
-              <textarea
-                rows={2}
-                value={info.criteria}
-                onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))}
-                placeholder="何ができたら完了か"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            ) : (
-              <ReadVal v={goal.criteria} />
-            )}
-          </InfoField>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InfoField label="期日">
-            {canEdit ? (
-              <input
-                type="date"
-                value={info.due_date || ''}
-                onChange={(e) => setInfo((p) => ({ ...p, due_date: e.target.value }))}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            ) : (
-              <ReadVal v={goal.due_date} />
-            )}
-          </InfoField>
-          <InfoField label="担当">
-            {canEdit ? (
-              <select
-                value={info.owner_id || ''}
-                onChange={(e) => setInfo((p) => ({ ...p, owner_id: e.target.value }))}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-zinc-500"
-              >
-                <option value="">未割当</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <ReadVal v={members.find((m) => m.id === goal.owner_id)?.name} />
-            )}
-          </InfoField>
-        </div>
-        {canEdit && infoDirty && (
-          <div className="flex justify-end">
-            <button
-              onClick={saveInfo}
-              disabled={savingInfo}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
-            >
-              {savingInfo ? '保存中…' : '保存'}
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* 成果物 */}
-      <section className="mt-6">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <ChevronDown className="h-5 w-5" />
-          成果物
-        </h2>
-
-        <div
-          className={cn(
-            'mt-3 rounded-xl border p-4 transition-colors',
-            dragOver ? 'border-brand bg-brand/5' : 'border-zinc-200',
+    <div className="flex h-full flex-col lg:flex-row">
+      {/* 左：内容（スクロール） */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[920px] px-4 py-5 sm:px-8">
+          {/* パンくず */}
+          {crumbs.length > 1 && (
+            <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs text-zinc-400">
+              {crumbs.map((c, i) => (
+                <span key={c.id} className="flex items-center gap-1">
+                  {i > 0 && <ChevronRight className="h-3 w-3" />}
+                  {c.id === goalId ? (
+                    <span className="text-zinc-600">{c.title}</span>
+                  ) : (
+                    <button onClick={() => navigate(`/goals/${c.id}`)} className="truncate hover:text-zinc-700 hover:underline">
+                      {c.title}
+                    </button>
+                  )}
+                </span>
+              ))}
+            </nav>
           )}
-          onDragOver={(e) => {
-            e.preventDefault()
-            if (available) setDragOver(true)
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-        >
-          {/* ヘッダ: 検索・並べ替え・新規作成 */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-medium">{goal.title}</h3>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-500 focus-within:border-zinc-400">
-                <Search className="h-4 w-4 shrink-0 text-zinc-400" />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="検索"
-                  className="w-24 min-w-0 bg-transparent outline-none placeholder:text-zinc-400"
-                />
-              </div>
-              <button
-                onClick={() => setAsc((v) => !v)}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
-              >
-                <ArrowUpDown className="h-4 w-4" />
-                {asc ? '名前↑' : '名前↓'}
-              </button>
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={!available || busy}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
-              >
-                <Plus className="h-4 w-4" />
-                {busy ? 'アップロード中…' : '新規作成'}
-              </button>
-              <input ref={fileRef} type="file" onChange={onPick} className="hidden" />
-            </div>
+
+          {/* タイトル */}
+          <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-6 py-8 text-center">
+            <h1 className="text-2xl font-bold tracking-wide sm:text-3xl">{goal.title}</h1>
           </div>
 
-          {!available ? (
-            // テーブル/バケット未作成のときの案内（壊さず静かに無効化）
-            <div className="flex flex-col items-center justify-center py-14 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-dashed border-amber-200 text-amber-400">
-                <Upload className="h-7 w-7" />
-              </div>
-              <p className="mt-4 font-bold text-zinc-600">成果物機能はまだ無効です</p>
-              <p className="mt-1 max-w-sm text-sm text-zinc-400">
-                <code className="rounded bg-zinc-100 px-1">db/deliverables.sql</code>{' '}
-                を Supabase の SQL Editor で一度実行すると、ファイルのアップロードが有効になります。
-              </p>
+          {/* ゴール情報 */}
+          <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoField label="現状">
+                {canEdit ? (
+                  <textarea rows={2} value={info.current} onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))} placeholder="今どういう状態か" className={inputCls} />
+                ) : (
+                  <ReadVal v={goal.current} />
+                )}
+              </InfoField>
+              <InfoField label="完了の基準">
+                {canEdit ? (
+                  <textarea rows={2} value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か" className={inputCls} />
+                ) : (
+                  <ReadVal v={goal.criteria} />
+                )}
+              </InfoField>
             </div>
-          ) : (
-            <>
-              <div className="mt-3 grid grid-cols-[1fr_92px] gap-2 border-b border-zinc-100 pb-2 text-xs text-zinc-400 sm:grid-cols-[1fr_140px_80px]">
-                <span>名前</span>
-                <span className="hidden text-right sm:block">更新日</span>
-                <span className="text-right">操作</span>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoField label="期日">
+                {canEdit ? (
+                  <input type="date" value={info.due_date || ''} onChange={(e) => setInfo((p) => ({ ...p, due_date: e.target.value }))} className={inputCls} />
+                ) : (
+                  <ReadVal v={goal.due_date} />
+                )}
+              </InfoField>
+              <InfoField label="担当">
+                {canEdit ? (
+                  <select value={info.owner_id || ''} onChange={(e) => setInfo((p) => ({ ...p, owner_id: e.target.value }))} className={inputCls}>
+                    <option value="">未割当</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <ReadVal v={members.find((m) => m.id === goal.owner_id)?.name} />
+                )}
+              </InfoField>
+            </div>
+            {canEdit && infoDirty && (
+              <div className="flex justify-end">
+                <button onClick={saveInfo} disabled={savingInfo} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
+                  {savingInfo ? '保存中…' : '保存'}
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* タスク */}
+          <section className="mt-6">
+            <h2 className="flex items-center gap-2 text-lg font-bold">
+              タスク
+              {tasks.length > 0 && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-normal text-zinc-500">
+                  {doneCount}/{tasks.length}
+                </span>
+              )}
+            </h2>
+            <ul className="mt-3 space-y-1">
+              {tasks.map((t) => (
+                <li key={t.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50">
+                  <button
+                    onClick={() => toggleTask(t)}
+                    className={cn(
+                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+                      t.status === 'done' ? 'bg-emerald-500 text-white' : 'bg-brand text-white',
+                    )}
+                  >
+                    {t.status === 'done' ? <Check className="h-3 w-3" strokeWidth={3} /> : <Play className="h-2.5 w-2.5 translate-x-0.5 fill-white" />}
+                  </button>
+                  <button
+                    onClick={() => setOpenTaskId(t.id)}
+                    className={cn('flex-1 truncate text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
+                  >
+                    {t.title}
+                  </button>
+                  <TaskMeta task={t} />
+                  <button onClick={() => setOpenTaskId(t.id)} title="詳細" className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-1 flex items-center gap-3 rounded-lg px-2 py-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-zinc-300 text-zinc-300">
+                <Plus className="h-3.5 w-3.5" />
+              </span>
+              <input
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitTask()}
+                placeholder="タイトルを「〜する」の形で入力して Enter"
+                className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
+              />
+            </div>
+          </section>
+
+          {/* 成果物 */}
+          <section className="mt-6 pb-6">
+            <h2 className="flex items-center gap-2 text-lg font-bold">
+              <ChevronDown className="h-5 w-5" />
+              成果物
+            </h2>
+            <div
+              className={cn('mt-3 rounded-xl border p-4 transition-colors', dragOver ? 'border-brand bg-brand/5' : 'border-zinc-200')}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (available) setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={onDrop}
+            >
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-500 focus-within:border-zinc-400">
+                  <Search className="h-4 w-4 shrink-0 text-zinc-400" />
+                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="検索" className="w-24 min-w-0 bg-transparent outline-none placeholder:text-zinc-400" />
+                </div>
+                <button onClick={() => setAsc((v) => !v)} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50">
+                  <ArrowUpDown className="h-4 w-4" />
+                  {asc ? '名前↑' : '名前↓'}
+                </button>
+                <button onClick={() => fileRef.current?.click()} disabled={!available || busy} className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
+                  <Plus className="h-4 w-4" />
+                  {busy ? 'アップロード中…' : '新規作成'}
+                </button>
+                <input ref={fileRef} type="file" onChange={onPick} className="hidden" />
               </div>
 
-              {shown.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-14 text-center">
+              {!available ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-dashed border-amber-200 text-amber-400">
+                    <Upload className="h-7 w-7" />
+                  </div>
+                  <p className="mt-4 font-bold text-zinc-600">成果物機能はまだ無効です</p>
+                  <p className="mt-1 max-w-sm text-sm text-zinc-400">
+                    <code className="rounded bg-zinc-100 px-1">db/deliverables.sql</code> を実行すると有効になります。
+                  </p>
+                </div>
+              ) : shown.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-dashed border-zinc-200 text-zinc-300">
                     <Upload className="h-7 w-7" />
                   </div>
-                  <p className="mt-4 font-bold text-zinc-600">
-                    {q ? '一致する成果物がありません' : '成果物がありません'}
-                  </p>
-                  {!q && (
-                    <p className="mt-1 text-sm text-zinc-400">
-                      ファイルをここにドラッグ&ドロップ、または「新規作成」から追加
-                    </p>
-                  )}
+                  <p className="mt-4 font-bold text-zinc-600">{q ? '一致する成果物がありません' : '成果物がありません'}</p>
+                  {!q && <p className="mt-1 text-sm text-zinc-400">ファイルをドラッグ&ドロップ、または「新規作成」から追加</p>}
                 </div>
               ) : (
-                <ul className="divide-y divide-zinc-100">
+                <ul className="mt-3 divide-y divide-zinc-100">
                   {shown.map((d) => (
-                    <li
-                      key={d.id}
-                      className="grid grid-cols-[1fr_92px] items-center gap-2 py-2.5 text-sm sm:grid-cols-[1fr_140px_80px]"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
-                        <span className="truncate text-zinc-700">{d.name}</span>
-                      </span>
-                      <span className="hidden text-right text-xs text-zinc-400 sm:block">
-                        {fmt(d.created_at)}
-                      </span>
-                      <span className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => download(d)}
-                          title="ダウンロード"
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => remove(d)}
-                          title="削除"
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </span>
+                    <li key={d.id} className="flex items-center gap-2 py-2.5 text-sm">
+                      <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
+                      <span className="min-w-0 flex-1 truncate text-zinc-700">{d.name}</span>
+                      <span className="hidden shrink-0 text-xs text-zinc-400 sm:block">{fmt(d.created_at)}</span>
+                      <button onClick={() => download(d)} title="ダウンロード" className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
+                        <Download className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => remove(d)} title="削除" className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </li>
                   ))}
                 </ul>
               )}
-            </>
-          )}
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
-      {/* コメント（右下FAB） */}
-      <button
-        onClick={() => setCommentsOpen(true)}
-        className="fixed bottom-6 right-6 z-20 flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90"
-      >
-        <MessageSquare className="h-4 w-4" />
-        {commentCount}件
-      </button>
-
-      {/* コメントドロワー */}
-      {commentsOpen && (
-        <div className="fixed inset-0 z-30 flex justify-end bg-black/30" onClick={() => setCommentsOpen(false)}>
-          <div
-            className="flex h-full w-full max-w-md flex-col bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-              <h3 className="flex items-center gap-2 font-bold">
-                <MessageSquare className="h-5 w-5 text-zinc-500" />
-                コメント
-              </h3>
-              <button onClick={() => setCommentsOpen(false)} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-              {comments.length === 0 ? (
-                <p className="mt-10 text-center text-sm text-zinc-400">
-                  まだコメントがありません。経緯や詰まりを残しましょう。
-                </p>
-              ) : (
-                comments.map((c) => {
-                  const mine = c.author_id === meId
-                  return (
-                    <div key={c.id} className={cn('flex flex-col', mine && 'items-end')}>
-                      <span className="mb-0.5 text-xs text-zinc-400">
-                        {authors[c.author_id] ?? 'メンバー'}・{fmt(c.created_at)}
-                      </span>
-                      <div
-                        className={cn(
-                          'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm',
-                          mine ? 'bg-brand text-white' : 'bg-zinc-100 text-zinc-800',
-                        )}
-                      >
-                        {c.body}
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 border-t border-zinc-200 px-4 py-3">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendComment()}
-                placeholder="コメントを入力…"
-                className="flex-1 rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none focus:border-zinc-500"
-              />
-              <button
-                onClick={sendComment}
-                disabled={!draft.trim()}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-white hover:opacity-90 disabled:opacity-40"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+      {/* 右：常駐チャット（PCは右カラム／スマホは下に積む） */}
+      <aside className="flex max-h-[45vh] shrink-0 flex-col border-t border-zinc-200 lg:max-h-none lg:w-[360px] lg:border-l lg:border-t-0">
+        <div className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 font-bold">
+          <MessageSquare className="h-5 w-5 text-zinc-500" />
+          チャット
         </div>
-      )}
+        <CommentThread targetType="goal" targetId={goalId} className="flex-1" />
+      </aside>
+
+      <TaskDetailModal
+        taskId={openTaskId}
+        open={!!openTaskId}
+        onClose={() => setOpenTaskId(null)}
+        onSaved={reloadTasks}
+      />
     </div>
   )
 }
 
-function fmt(ts) {
-  try {
-    return new Date(ts).toLocaleString('ja-JP', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return ''
-  }
-}
+const inputCls =
+  'w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500'
 
 function InfoField({ label, children }) {
   return (
@@ -434,4 +372,12 @@ function InfoField({ label, children }) {
 
 function ReadVal({ v }) {
   return <p className="whitespace-pre-wrap text-sm text-zinc-700">{v || <span className="text-zinc-400">—</span>}</p>
+}
+
+function fmt(ts) {
+  try {
+    return new Date(ts).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
 }

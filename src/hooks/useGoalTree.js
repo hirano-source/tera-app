@@ -14,14 +14,22 @@ export function useGoalTree() {
 
   const load = useCallback(async () => {
     if (!currentId) return
-    const [g, t, u] = await Promise.all([
+    const [g, t, u, c] = await Promise.all([
       supabase.from('goals').select('*').eq('workspace_id', currentId).order('created_at'),
       supabase.from('tasks').select('*').eq('workspace_id', currentId).order('created_at'),
       supabase.from('users').select('id,name,avatar_color'),
+      supabase.from('comments').select('target_type,target_id').eq('workspace_id', currentId),
     ])
     const goals = g.data ?? []
     const tasks = t.data ?? []
     setUsers(Object.fromEntries((u.data ?? []).map((x) => [x.id, x])))
+
+    // コメント数（ゴール/タスク別）
+    const commentCount = {}
+    ;(c.data ?? []).forEach((cm) => {
+      const key = `${cm.target_type}:${cm.target_id}`
+      commentCount[key] = (commentCount[key] ?? 0) + 1
+    })
 
     const goalsByParent = {}
     goals.forEach((go) => {
@@ -33,14 +41,24 @@ export function useGoalTree() {
     })
 
     const build = (parentId) =>
-      (goalsByParent[parentId] ?? []).map((go) => ({
-        ...go,
-        kind: 'goal',
-        children: [
-          ...build(go.id),
-          ...(tasksByGoal[go.id] ?? []).map((ta) => ({ ...ta, kind: 'task' })),
-        ],
-      }))
+      (goalsByParent[parentId] ?? []).map((go) => {
+        const goalTasks = tasksByGoal[go.id] ?? []
+        return {
+          ...go,
+          kind: 'goal',
+          commentCount: commentCount[`goal:${go.id}`] ?? 0,
+          taskDone: goalTasks.filter((x) => x.status === 'done').length,
+          taskTotal: goalTasks.length,
+          children: [
+            ...build(go.id),
+            ...goalTasks.map((ta) => ({
+              ...ta,
+              kind: 'task',
+              commentCount: commentCount[`task:${ta.id}`] ?? 0,
+            })),
+          ],
+        }
+      })
 
     setTree(build(null))
     setLoading(false)

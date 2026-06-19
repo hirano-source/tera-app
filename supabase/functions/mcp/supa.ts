@@ -174,6 +174,39 @@ export async function updateTask(
   return data
 }
 
+export async function addComment(
+  ctx: Ctx,
+  { targetType, targetId, body }: { targetType: string; targetId: string; body: string },
+) {
+  const { data, error } = await ctx.db
+    .from('comments')
+    .insert({
+      workspace_id: ctx.workspaceId,
+      target_type: targetType,
+      target_id: targetId,
+      author_id: ctx.userId,
+      body,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function listComments(
+  ctx: Ctx,
+  { targetType, targetId }: { targetType: string; targetId: string },
+) {
+  const { data } = await ctx.db
+    .from('comments')
+    .select('id,body,author_id,resolved,created_at')
+    .eq('workspace_id', ctx.workspaceId)
+    .eq('target_type', targetType)
+    .eq('target_id', targetId)
+    .order('created_at')
+  return data ?? []
+}
+
 export async function deleteTask(ctx: Ctx, { taskId }: { taskId: string }) {
   // RLSで削除は owner/admin のみ許可。権限が無ければ0件削除＝実質no-op。
   const { error } = await ctx.db.from('tasks').delete().eq('id', taskId)

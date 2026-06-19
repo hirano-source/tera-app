@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronRight, Play, Check,
-  ListPlus, GitBranchPlus, Maximize2, Users, X,
+  ListPlus, GitBranchPlus, Maximize2, Users, X, MessageSquare,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import TaskMeta from '../tasks/TaskMeta'
 
 // スキルツリー：ゴール/タスクのノードを接続線付きで再帰表示する。
 // canEditGoals=false（メンバー）はゴールの追加・担当割当を出さない（タスクは全員可）。
@@ -110,6 +111,25 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             {owner && <Avatar user={owner} />}
           </button>
         )}
+
+        {/* メタ：ゴールは完了数/全体＋コメント数、タスクは優先度/期日/状態/コメント数 */}
+        {isGoal
+          ? (node.taskTotal > 0 || node.commentCount > 0) && (
+              <span className="flex shrink-0 items-center gap-2 text-xs text-zinc-400">
+                {node.taskTotal > 0 && (
+                  <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
+                    {node.taskDone}/{node.taskTotal}
+                  </span>
+                )}
+                {node.commentCount > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <MessageSquare className="h-3 w-3" />
+                    {node.commentCount}
+                  </span>
+                )}
+              </span>
+            )
+          : <TaskMeta task={node} commentCount={node.commentCount} />}
 
         {/* ホバーで出るクイック操作バー（本家のグレーのアイコン列に相当） */}
         {isGoal && (

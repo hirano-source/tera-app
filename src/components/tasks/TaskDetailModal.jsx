@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { useWorkspace } from '../../hooks/useWorkspace'
+import CommentThread from '../comments/CommentThread'
+import { cn } from '../../utils/cn'
 
 // タスクの詳細（右からのドロワー）。クリックで開き、6項目を表示／編集する。
 // 入力は基本Claude(MCP)が埋める想定だが、ここで人が直接いじることもできる。
@@ -33,27 +35,52 @@ const BLOCKER = [
 ]
 
 export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
-  const { current } = useWorkspace()
+  const { current, currentId } = useWorkspace()
   const canDelete = ['owner', 'admin'].includes(current?.role)
   const [t, setT] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [members, setMembers] = useState([])
+  const [assignees, setAssignees] = useState([]) // 担当（複数）user_id配列
 
   useEffect(() => {
     if (!open || !taskId) return
     setT(null)
     let active = true
-    supabase
-      .from('tasks')
-      .select('*')
-      .eq('id', taskId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) setT(data)
-      })
+    ;(async () => {
+      const { data } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle()
+      if (!active) return
+      setT(data)
+      // 複数担当の現状を読む
+      const { data: ta } = await supabase.from('task_assignees').select('user_id').eq('task_id', taskId)
+      const ids = (ta ?? []).map((x) => x.user_id)
+      // 主担当(assignee_id)も担当集合に含める
+      if (data?.assignee_id && !ids.includes(data.assignee_id)) ids.push(data.assignee_id)
+      if (active) setAssignees(ids)
+    })()
     return () => {
       active = false
     }
   }, [open, taskId])
+
+  // メンバー一覧（担当ピッカー用）
+  useEffect(() => {
+    if (!open || !currentId) return
+    let active = true
+    ;(async () => {
+      const { data: mem } = await supabase.from('memberships').select('user_id').eq('workspace_id', currentId)
+      const ids = (mem ?? []).map((m) => m.user_id)
+      if (ids.length) {
+        const { data: us } = await supabase.from('users').select('id,name,avatar_color').in('id', ids)
+        if (active) setMembers(us ?? [])
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [open, currentId])
+
+  const toggleAssignee = (id) =>
+    setAssignees((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]))
 
   if (!open) return null
 
@@ -72,12 +99,22 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
       due_date: t.due_date || null,
       completion_criteria: t.completion_criteria || null,
       approach: t.approach || null,
+      assignee_id: assignees[0] ?? null, // 主担当＝先頭
       blocker_type: blocked ? t.blocker_type || null : null,
       blocker_owner: blocked ? t.blocker_owner || null : null,
       blocker_note: blocked ? t.blocker_note || null : null,
       blocker_since: blocked ? t.blocker_since || new Date().toISOString() : null,
     }
     const { error } = await supabase.from('tasks').update(patch).eq('id', t.id)
+    if (!error) {
+      // 複数担当を同期：一旦消して、選択中を入れ直す
+      await supabase.from('task_assignees').delete().eq('task_id', t.id)
+      if (assignees.length && currentId) {
+        await supabase
+          .from('task_assignees')
+          .insert(assignees.map((uid) => ({ task_id: t.id, user_id: uid, workspace_id: currentId })))
+      }
+    }
     setBusy(false)
     if (error) {
       alert('保存に失敗しました: ' + error.message)
@@ -137,6 +174,34 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
 
             <Field label="区分">
               <Select value={t.recurrence || ''} onChange={(v) => set('recurrence', v)} options={RECURRENCE} />
+            </Field>
+
+            <Field label="担当（複数可）">
+              <div className="flex flex-wrap gap-1.5">
+                {members.map((m) => {
+                  const on = assignees.includes(m.id)
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => toggleAssignee(m.id)}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
+                        on ? 'border-brand bg-brand/10 text-brand' : 'border-zinc-300 text-zinc-500 hover:bg-zinc-50',
+                      )}
+                    >
+                      <span
+                        className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                        style={{ backgroundColor: m.avatar_color || '#6d5dfc' }}
+                      >
+                        {(m.name || '?').charAt(0).toUpperCase()}
+                      </span>
+                      {m.name}
+                    </button>
+                  )
+                })}
+                {members.length === 0 && <span className="text-xs text-zinc-400">メンバーがいません</span>}
+              </div>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
@@ -200,6 +265,14 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
                 </Field>
               </div>
             )}
+
+            {/* コメント / 議事録（このタスクに文脈が溜まる。Claudeも書き込める） */}
+            <div>
+              <span className="mb-1 block text-xs font-medium text-zinc-500">コメント / 議事録</span>
+              <div className="h-72 overflow-hidden rounded-lg border border-zinc-200">
+                <CommentThread targetType="task" targetId={t.id} className="h-full" />
+              </div>
+            </div>
           </div>
         )}
 
