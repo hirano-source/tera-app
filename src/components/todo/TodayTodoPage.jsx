@@ -16,6 +16,7 @@ import {
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoals } from '../../hooks/useGoals'
 import CalendarLinkModal from '../calendar/CalendarLinkModal'
+import MicButton from '../common/MicButton'
 import { useNavigate } from 'react-router-dom'
 
 // 今日のToDo 画面 (/todo)。
@@ -114,10 +115,10 @@ export default function TodayTodoPage() {
               value={taskText}
               onChange={(e) => setTaskText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submitTask()}
-              onBlur={() => taskText.trim() ? submitTask() : setAddingTask(false)}
               placeholder="タスクを入力して Enter"
               className="flex-1 bg-transparent text-zinc-700 outline-none placeholder:text-zinc-400"
             />
+            <MicButton onText={(t) => setTaskText((p) => (p ? p + ' ' : '') + t)} />
           </div>
         )}
 
@@ -182,6 +183,7 @@ export default function TodayTodoPage() {
               placeholder="達成したいゴールを入力して Enter"
               className="flex-1 bg-transparent text-zinc-700 outline-none placeholder:text-zinc-400"
             />
+            <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
           </li>
         </ul>
       </section>

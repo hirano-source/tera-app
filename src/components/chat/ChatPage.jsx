@@ -3,6 +3,7 @@ import { Search, BookText, Send, Target } from 'lucide-react'
 import { useChat } from '../../hooks/useChat'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { cn } from '../../utils/cn'
+import MicButton from '../common/MicButton'
 
 // チャット 画面 (/chat)。ゴール＝スレッド。左に一覧、右にメッセージ。
 export default function ChatPage() {
@@ -103,6 +104,7 @@ export default function ChatPage() {
                 placeholder="メッセージを入力…"
                 className="flex-1 rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none focus:border-zinc-500"
               />
+              <MicButton onText={(t) => setText((p) => (p ? p + ' ' : '') + t)} />
               <button
                 onClick={send}
                 disabled={!text.trim()}
