@@ -91,10 +91,10 @@ export async function authorizeComplete(req: Request): Promise<Response> {
   if (!client || !client.redirect_uris.includes(b.redirect_uri))
     return json({ error: 'invalid_client' }, 400)
 
-  // refresh_token から本人（user_id）を確定。失敗＝未ログイン扱い。
-  let ctx
+  // refresh_token から本人（user_id）を確定し、回転後の種を確保。失敗＝未ログイン扱い。
+  let sess
   try {
-    ctx = await supa.contextFromRefresh(b.refresh_token)
+    sess = await supa.refreshSession(b.refresh_token)
   } catch {
     return json({ error: 'access_denied', error_description: 'login required' }, 401)
   }
@@ -103,8 +103,8 @@ export async function authorizeComplete(req: Request): Promise<Response> {
     client_id: b.client_id,
     redirect_uri: b.redirect_uri,
     code_challenge: b.code_challenge,
-    user_id: ctx.userId,
-    refresh_token: ctx.refreshToken,
+    user_id: sess.userId,
+    refresh_token: sess.refreshToken,
     resource: b.resource,
   })
 

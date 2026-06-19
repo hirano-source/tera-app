@@ -14,32 +14,55 @@ export type Ctx = {
   userId: string
   workspaceId: string | null
   workspaceName: string | null
-  refreshToken: string   // 回転後の最新リフレッシュトークン（保存し直す用）
 }
 
-// 保存しておいたリフレッシュトークンから「そのユーザーとしてのクライアント」を起こす。
-// 成功すると RLS が auth.uid()=このユーザー で効く。
-export async function contextFromRefresh(refreshToken: string): Promise<Ctx> {
+// リフレッシュで得た生セッション（DBにキャッシュする素材）。
+// access_token は Supabase が署名した本物のJWT（ES256・約1時間有効）。
+export type Session = {
+  accessToken: string
+  refreshToken: string
+  expiresAt: string // ISO。この時刻まではリフレッシュ不要で使い回せる。
+  userId: string
+}
+
+// JWTのペイロードから sub(=userId) を取り出す（検証はPostgREST側に任せる）。
+function subFromJwt(jwt: string): string {
+  const part = jwt.split('.')[1] ?? ''
+  const b64 = part.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(part.length / 4) * 4, '=')
+  return JSON.parse(atob(b64)).sub
+}
+
+// リフレッシュトークンを1回だけ使い、生セッションを取り出す（=回転が起きる箇所）。
+// 毎リクエストではなく「キャッシュ切れ時」と「接続時」だけ呼ぶ＝再利用検知の競合を避ける。
+export async function refreshSession(refreshToken: string): Promise<Session> {
   const anon = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const { data: sess, error } = await anon.auth.refreshSession({ refresh_token: refreshToken })
   if (error || !sess.session) throw new Error(`セッション更新に失敗: ${error?.message ?? 'no session'}`)
+  const expiresAtSec = sess.session.expires_at ?? Math.floor(Date.now() / 1000) + 3600
+  return {
+    accessToken: sess.session.access_token,
+    refreshToken: sess.session.refresh_token,
+    expiresAt: new Date(expiresAtSec * 1000).toISOString(),
+    userId: sess.user!.id,
+  }
+}
 
-  // ユーザーのJWTを明示的に付けたクライアント＝以後の全クエリにRLSが効く
+// 有効な生アクセストークン(JWT)から「そのユーザーとしてのクライアント」を起こす。
+// リフレッシュを伴わない＝回転しない。キャッシュが生きている間はこちらだけを通る。
+export async function contextFromAccessToken(accessToken: string): Promise<Ctx> {
   const db = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${sess.session.access_token}` } },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
   })
-  const userId = sess.user!.id
   const { data: mem } = await db
     .from('memberships').select('workspace_id, workspaces(name)').limit(1).maybeSingle()
   return {
     db,
-    userId,
+    userId: subFromJwt(accessToken),
     workspaceId: mem?.workspace_id ?? null,
     workspaceName: (mem?.workspaces as { name?: string } | null)?.name ?? null,
-    refreshToken: sess.session.refresh_token,
   }
 }
 

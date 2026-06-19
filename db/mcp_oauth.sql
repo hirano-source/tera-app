@@ -29,12 +29,14 @@ create table if not exists oauth_codes (
 
 -- アクセストークン（/token で発行 → /mcp で Bearer として提示）
 create table if not exists oauth_tokens (
-  access_token   text primary key,
-  client_id      text not null,
-  user_id        uuid not null,
-  refresh_token  text not null,           -- ユーザーとして再ログインするための種（回転に追従して更新）
-  expires_at     timestamptz not null,
-  created_at     timestamptz default now()
+  access_token         text primary key,
+  client_id            text not null,
+  user_id              uuid not null,
+  refresh_token        text not null,           -- ユーザーとして再ログインするための種（回転に追従して更新）
+  session_access_token text,                    -- キャッシュした生のSupabase JWT（約1時間有効）。有効な間はこれを使い回す
+  session_expires_at   timestamptz,             -- その生JWTの期限。切れた時だけ refresh_token で更新する
+  expires_at           timestamptz not null,
+  created_at           timestamptz default now()
 );
 create index if not exists oauth_tokens_user on oauth_tokens (user_id);
 

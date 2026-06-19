@@ -59,8 +59,17 @@ async function handleMcp(req: Request, base: string): Promise<Response> {
 
   let ctx
   try {
-    ctx = await supa.contextFromRefresh(tok.refresh_token)
-    await store.rotateRefresh(tok.access_token, ctx.refreshToken) // 回転後の種を保存
+    const now = Date.now()
+    const cachedExp = tok.session_expires_at ? new Date(tok.session_expires_at).getTime() : 0
+    if (tok.session_access_token && cachedExp > now + 60_000) {
+      // キャッシュした生トークンが有効（60秒の余裕込み）→ リフレッシュ不要＝回転なし＝競合なし
+      ctx = await supa.contextFromAccessToken(tok.session_access_token)
+    } else {
+      // 期限切れ or 初回 → 1回だけリフレッシュして結果をキャッシュ（次回からは上の分岐で使い回す）
+      const s = await supa.refreshSession(tok.refresh_token)
+      await store.cacheSession(tok.access_token, s)
+      ctx = await supa.contextFromAccessToken(s.accessToken)
+    }
   } catch {
     return unauthorized(base) // セッション失効 → 再認可させる
   }

@@ -76,7 +76,15 @@ export async function lookupToken(accessToken: string) {
   return data
 }
 
-// リフレッシュトークンは使うたびに回転する。最新の種に更新して次回に備える。
-export async function rotateRefresh(accessToken: string, refresh_token: string) {
-  await admin.from('oauth_tokens').update({ refresh_token }).eq('access_token', accessToken)
+// リフレッシュで得た生セッションをキャッシュする。次回からは期限までこれを使い回し、
+// リフレッシュ（＝回転）を避ける。回転後の最新リフレッシュトークンも同時に保存。
+export async function cacheSession(
+  accessToken: string,
+  s: { accessToken: string; refreshToken: string; expiresAt: string },
+) {
+  await admin.from('oauth_tokens').update({
+    session_access_token: s.accessToken,
+    session_expires_at: s.expiresAt,
+    refresh_token: s.refreshToken,
+  }).eq('access_token', accessToken)
 }
