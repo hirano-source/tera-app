@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { Plus, Settings2, HelpCircle, Check } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
+import { useWorkspace } from '../../hooks/useWorkspace'
 import GoalTree from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
+  const { current } = useWorkspace()
+  const canEditGoals = ['owner', 'admin'].includes(current?.role)
   const { todos, toggleTask, addTask } = useTodayTodo()
   const {
     tree,
@@ -121,22 +124,25 @@ export default function TodayTodoPage() {
           onAddTask={addGoalTask}
           onAddGoal={createGoal}
           onAssignOwner={assignOwner}
+          canEditGoals={canEditGoals}
         />
 
-        {/* ゴール作成の入力行 */}
-        <div className="mt-1 flex items-center gap-3 rounded-lg py-2 pl-7 pr-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-white">
-            <Plus className="h-4 w-4" />
-          </span>
-          <input
-            value={goalText}
-            onChange={(e) => setGoalText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitGoal()}
-            placeholder="達成したいゴールを入力して Enter"
-            className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
-          />
-          <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
-        </div>
+        {/* ゴール作成の入力行（owner/admin のみ） */}
+        {canEditGoals && (
+          <div className="mt-1 flex items-center gap-3 rounded-lg py-2 pl-7 pr-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+              <Plus className="h-4 w-4" />
+            </span>
+            <input
+              value={goalText}
+              onChange={(e) => setGoalText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitGoal()}
+              placeholder="達成したいゴールを入力して Enter"
+              className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
+            />
+            <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
+          </div>
+        )}
       </section>
     </div>
   )

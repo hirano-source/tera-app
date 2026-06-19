@@ -7,7 +7,8 @@ import {
 import { cn } from '../../utils/cn'
 
 // スキルツリー：ゴール/タスクのノードを接続線付きで再帰表示する。
-export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner }) {
+// canEditGoals=false（メンバー）はゴールの追加・担当割当を出さない（タスクは全員可）。
+export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, canEditGoals = true }) {
   return (
     <div>
       {tree.map((node) => (
@@ -20,13 +21,14 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
           onAddTask={onAddTask}
           onAddGoal={onAddGoal}
           onAssignOwner={onAssignOwner}
+          canEditGoals={canEditGoals}
         />
       ))}
     </div>
   )
 }
 
-function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner }) {
+function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner, canEditGoals }) {
   const navigate = useNavigate()
   const isGoal = node.kind === 'goal'
   const children = node.children ?? []
@@ -119,25 +121,29 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             <ToolButton title="タスクを追加" onClick={() => startAdd('task')}>
               <ListPlus className="h-4 w-4" />
             </ToolButton>
-            <ToolButton title="子ゴールを追加" onClick={() => startAdd('goal')}>
-              <GitBranchPlus className="h-4 w-4" />
-            </ToolButton>
-            <div className="relative">
-              <ToolButton title="担当者を割り当て" onClick={() => setPickerOpen((v) => !v)}>
-                <Users className="h-4 w-4" />
+            {canEditGoals && (
+              <ToolButton title="子ゴールを追加" onClick={() => startAdd('goal')}>
+                <GitBranchPlus className="h-4 w-4" />
               </ToolButton>
-              {pickerOpen && (
-                <AssignPopover
-                  members={Object.values(users)}
-                  currentOwnerId={node.owner_id}
-                  onPick={(uid) => {
-                    onAssignOwner(node.id, uid)
-                    setPickerOpen(false)
-                  }}
-                  onClose={() => setPickerOpen(false)}
-                />
-              )}
-            </div>
+            )}
+            {canEditGoals && (
+              <div className="relative">
+                <ToolButton title="担当者を割り当て" onClick={() => setPickerOpen((v) => !v)}>
+                  <Users className="h-4 w-4" />
+                </ToolButton>
+                {pickerOpen && (
+                  <AssignPopover
+                    members={Object.values(users)}
+                    currentOwnerId={node.owner_id}
+                    onPick={(uid) => {
+                      onAssignOwner(node.id, uid)
+                      setPickerOpen(false)
+                    }}
+                    onClose={() => setPickerOpen(false)}
+                  />
+                )}
+              </div>
+            )}
             <ToolButton title="詳細を開く" onClick={() => navigate(`/goals/${node.id}`)}>
               <Maximize2 className="h-4 w-4" />
             </ToolButton>
@@ -158,6 +164,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
               onAddTask={onAddTask}
               onAddGoal={onAddGoal}
               onAssignOwner={onAssignOwner}
+              canEditGoals={canEditGoals}
             />
           ))}
           {addMode && (
