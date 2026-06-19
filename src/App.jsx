@@ -13,7 +13,7 @@ import { useAuth } from './hooks/useAuth'
 // ───────────────────────────────────────────────────────────
 export default function App() {
   const { loading, session } = useAuth()
-  const { user, points } = useWorkspace()
+  const { user } = useWorkspace()
   const location = useLocation()
 
   if (loading) {
@@ -30,7 +30,7 @@ export default function App() {
   if (!session) return <LoginPage />
 
   return (
-    <AppLayout user={user} points={points}>
+    <AppLayout user={user}>
       <AppRouter />
     </AppLayout>
   )

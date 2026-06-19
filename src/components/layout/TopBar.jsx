@@ -3,7 +3,7 @@ import { Search, ChevronDown, Check, Plus } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
 
 // 上部バー（ダーク）。左に事業（ワークスペース）切替、中央に検索、右にポイント。
-export default function TopBar({ points }) {
+export default function TopBar() {
   const { workspaces, current, setCurrent, createBusiness } = useWorkspace()
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -98,12 +98,6 @@ export default function TopBar({ points }) {
           <Search className="h-4 w-4" />
           <span className="text-sm">検索</span>
         </div>
-      </div>
-
-      {/* 右: ポイント */}
-      <div className="flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm text-zinc-200">
-        <span className="text-base">🪙</span>
-        <span className="font-semibold">{points}</span>
       </div>
     </header>
   )

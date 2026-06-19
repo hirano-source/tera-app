@@ -69,7 +69,6 @@ export function WorkspaceProvider({ children }) {
       initial: (display.name || '?').charAt(0).toUpperCase(),
       color: display.avatar_color || '#6d5dfc',
     },
-    points: 0,
     loading,
   }
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
