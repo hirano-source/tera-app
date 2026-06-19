@@ -25,6 +25,7 @@ export default function TodayTodoPage() {
     createGoal,
     addTask: addGoalTask,
     toggleTask: toggleGoalTask,
+    assignOwner,
   } = useGoalTree()
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [toastOpen, setToastOpen] = useState(true)
@@ -156,6 +157,8 @@ export default function TodayTodoPage() {
           users={users}
           onToggleTask={toggleGoalTask}
           onAddTask={addGoalTask}
+          onAddGoal={createGoal}
+          onAssignOwner={assignOwner}
         />
 
         {/* ゴール作成の入力行 */}

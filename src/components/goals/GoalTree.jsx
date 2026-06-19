@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronRight, Play, Check, Plus } from 'lucide-react'
+import {
+  ChevronDown, ChevronRight, Play, Check,
+  ListPlus, GitBranchPlus, Maximize2, Users, X,
+} from 'lucide-react'
 import { cn } from '../../utils/cn'
 
 // スキルツリー：ゴール/タスクのノードを接続線付きで再帰表示する。
-export default function GoalTree({ tree, users, onToggleTask, onAddTask }) {
+export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner }) {
   return (
     <div>
       {tree.map((node) => (
@@ -15,27 +18,40 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask }) {
           depth={0}
           onToggleTask={onToggleTask}
           onAddTask={onAddTask}
+          onAddGoal={onAddGoal}
+          onAssignOwner={onAssignOwner}
         />
       ))}
     </div>
   )
 }
 
-function Node({ node, users, depth, onToggleTask, onAddTask }) {
+function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner }) {
   const navigate = useNavigate()
   const isGoal = node.kind === 'goal'
   const children = node.children ?? []
   const hasChildren = children.length > 0
   const [open, setOpen] = useState(depth < 2)
-  const [adding, setAdding] = useState(false)
+  const [addMode, setAddMode] = useState(null) // null | 'task' | 'goal'
   const [text, setText] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const owner = isGoal ? users[node.owner_id] : users[node.assignee_id]
 
-  const submitTask = async () => {
-    if (text.trim()) await onAddTask(node.id, text)
+  const startAdd = (mode) => {
+    setAddMode(mode)
+    setOpen(true)
+  }
+
+  // 入力確定：モードに応じて このゴール配下に タスク or 子ゴール を作る
+  const submitAdd = async () => {
+    const t = text.trim()
+    if (t) {
+      if (addMode === 'goal') await onAddGoal(t, node.id)
+      else await onAddTask(node.id, t)
+    }
     setText('')
-    setAdding(false)
+    setAddMode(null)
   }
 
   return (
@@ -92,23 +108,45 @@ function Node({ node, users, depth, onToggleTask, onAddTask }) {
           </button>
         )}
 
-        {/* ゴールにタスク追加 */}
+        {/* ホバーで出るクイック操作バー（本家のグレーのアイコン列に相当） */}
         {isGoal && (
-          <button
-            onClick={() => {
-              setAdding(true)
-              setOpen(true)
-            }}
-            className="opacity-0 transition-opacity group-hover:opacity-100"
-            title="タスクを追加"
+          <div
+            className={cn(
+              'flex items-center gap-1 transition-opacity',
+              pickerOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            )}
           >
-            <Plus className="h-4 w-4 text-zinc-400 hover:text-zinc-700" />
-          </button>
+            <ToolButton title="タスクを追加" onClick={() => startAdd('task')}>
+              <ListPlus className="h-4 w-4" />
+            </ToolButton>
+            <ToolButton title="子ゴールを追加" onClick={() => startAdd('goal')}>
+              <GitBranchPlus className="h-4 w-4" />
+            </ToolButton>
+            <div className="relative">
+              <ToolButton title="担当者を割り当て" onClick={() => setPickerOpen((v) => !v)}>
+                <Users className="h-4 w-4" />
+              </ToolButton>
+              {pickerOpen && (
+                <AssignPopover
+                  members={Object.values(users)}
+                  currentOwnerId={node.owner_id}
+                  onPick={(uid) => {
+                    onAssignOwner(node.id, uid)
+                    setPickerOpen(false)
+                  }}
+                  onClose={() => setPickerOpen(false)}
+                />
+              )}
+            </div>
+            <ToolButton title="詳細を開く" onClick={() => navigate(`/goals/${node.id}`)}>
+              <Maximize2 className="h-4 w-4" />
+            </ToolButton>
+          </div>
         )}
       </div>
 
       {/* 子（接続線つき） */}
-      {open && (hasChildren || adding) && (
+      {open && (hasChildren || addMode) && (
         <div className="ml-[10px] border-l border-zinc-200 pl-3">
           {children.map((child) => (
             <Node
@@ -118,19 +156,27 @@ function Node({ node, users, depth, onToggleTask, onAddTask }) {
               depth={depth + 1}
               onToggleTask={onToggleTask}
               onAddTask={onAddTask}
+              onAddGoal={onAddGoal}
+              onAssignOwner={onAssignOwner}
             />
           ))}
-          {adding && (
+          {addMode && (
             <div className="flex items-center gap-3 py-1.5">
               <span className="h-5 w-5" />
-              <span className="h-7 w-7 shrink-0 rounded-full border-2 border-dashed border-zinc-300" />
+              {addMode === 'goal' ? (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-brand/40 text-[11px] font-bold text-brand">
+                  0
+                </span>
+              ) : (
+                <span className="h-7 w-7 shrink-0 rounded-full border-2 border-dashed border-zinc-300" />
+              )}
               <input
                 autoFocus
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submitTask()}
-                onBlur={submitTask}
-                placeholder="タスクを入力して Enter"
+                onKeyDown={(e) => e.key === 'Enter' && submitAdd()}
+                onBlur={submitAdd}
+                placeholder={addMode === 'goal' ? '子ゴールを入力して Enter' : 'タスクを入力して Enter'}
                 className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
               />
             </div>
@@ -138,6 +184,52 @@ function Node({ node, users, depth, onToggleTask, onAddTask }) {
         </div>
       )}
     </div>
+  )
+}
+
+// 担当者ピッカー（メンバーから1人選んで owner に。未割当も可）
+function AssignPopover({ members, currentOwnerId, onPick, onClose }) {
+  return (
+    <>
+      {/* 外側クリックで閉じる透明な背面 */}
+      <div className="fixed inset-0 z-10" onClick={onClose} />
+      <div className="absolute right-0 top-7 z-20 w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+        <div className="px-3 py-1 text-[11px] font-medium text-zinc-400">担当者</div>
+        {members.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => onPick(m.id)}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
+          >
+            <Avatar user={m} />
+            <span className="flex-1 truncate text-zinc-700">{m.name}</span>
+            {m.id === currentOwnerId && <Check className="h-3.5 w-3.5 text-brand" />}
+          </button>
+        ))}
+        <button
+          onClick={() => onPick(null)}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-500 hover:bg-zinc-50"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300">
+            <X className="h-3 w-3" />
+          </span>
+          未割当にする
+        </button>
+      </div>
+    </>
+  )
+}
+
+// ホバー操作バーの小ボタン（薄いグレー → ホバーで濃く）
+function ToolButton({ title, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+    >
+      {children}
+    </button>
   )
 }
 

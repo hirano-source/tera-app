@@ -1,0 +1,10 @@
+# Supabase ローカル設定（主に Edge Functions のデプロイ用）。
+# project_id は `supabase link` で結びつけるプロジェクト参照。
+project_id = "rjxfleeyntqusuoqzclw"
+
+# ホスト版MCP関数。
+# verify_jwt=false は必須：未認証の発見(/.well-known)・DCR(/register)・
+# 認可(/authorize)・トークン(/token) と、Supabase以外の自前Bearerでの /mcp 呼び出しを
+# プラットフォームのJWTゲートに弾かせないため。認可は関数内のOAuthで自前に行う。
+[functions.mcp]
+verify_jwt = false

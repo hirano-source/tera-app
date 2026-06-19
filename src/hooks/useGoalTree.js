@@ -80,6 +80,13 @@ export function useGoalTree() {
     await load()
   }
 
+  // ゴールの担当者（owner）を割り当て / 解除（ownerId=null）
+  const assignOwner = async (goalId, ownerId) => {
+    if (!currentId) return
+    setTree((prev) => setOwnerInTree(prev, goalId, ownerId))
+    await supabase.from('goals').update({ owner_id: ownerId }).eq('id', goalId)
+  }
+
   // タスク完了/未完了トグル
   const toggleTask = async (task) => {
     const next = task.status === 'done' ? 'todo' : 'done'
@@ -87,7 +94,7 @@ export function useGoalTree() {
     await supabase.from('tasks').update({ status: next }).eq('id', task.id)
   }
 
-  return { tree, users, loading, reload: load, createGoal, addTask, toggleTask }
+  return { tree, users, loading, reload: load, createGoal, addTask, toggleTask, assignOwner }
 }
 
 // ツリー内の該当タスクの status を差し替える（楽観的更新）
@@ -95,6 +102,15 @@ function toggleInTree(nodes, taskId, status) {
   return nodes.map((n) => {
     if (n.kind === 'task' && n.id === taskId) return { ...n, status }
     if (n.children) return { ...n, children: toggleInTree(n.children, taskId, status) }
+    return n
+  })
+}
+
+// ツリー内の該当ゴールの owner_id を差し替える（楽観的更新）
+function setOwnerInTree(nodes, goalId, ownerId) {
+  return nodes.map((n) => {
+    if (n.kind === 'goal' && n.id === goalId) return { ...n, owner_id: ownerId }
+    if (n.children) return { ...n, children: setOwnerInTree(n.children, goalId, ownerId) }
     return n
   })
 }
