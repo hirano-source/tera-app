@@ -115,13 +115,13 @@ export default function CommentThread({ targetType, targetId, members = [], clas
           </div>
         )}
         <div className="flex items-center gap-2">
-          <RecordButton onText={(text) => setDraft((d) => (d ? d + ' ' : '') + text)} />
+          <RecordButton onResult={(summary) => summary && addComment(summary)} />
           <input
             ref={inputRef}
             value={draft}
             onChange={onChange}
             onKeyDown={(e) => e.key === 'Enter' && mentionQuery === null && send()}
-            placeholder="コメント・議事録を入力（🎤録音 / @で指名）…"
+            placeholder="コメント・議事録を入力（@で指名 / 🎤で録音→要約投稿）…"
             className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
           />
           <button

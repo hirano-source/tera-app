@@ -13,3 +13,7 @@ verify_jwt = false
 # 関数で処理しつつ、本体では Bearer のユーザーJWTを getUser で自前検証する。
 [functions.transcribe]
 verify_jwt = false
+
+# 要約（LLM）。文字起こしの生テキストを議事録に整形。transcribeと同じGroqキーで動く。
+[functions.summarize]
+verify_jwt = false
