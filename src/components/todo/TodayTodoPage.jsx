@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Plus, Check, ChevronRight, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Check, ChevronRight, Trash2, Compass } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -27,6 +28,15 @@ export default function TodayTodoPage() {
   const [taskText, setTaskText] = useState('')
   const [goalText, setGoalText] = useState('')
   const [openTaskId, setOpenTaskId] = useState(null)
+  const navigate = useNavigate()
+
+  // 大目標は「絶対目標」なのでツリーに入れず別格表示にする。
+  // ツリーには大目標の配下（子ゴール／タスク）だけを渡す。
+  const visionGoalId = current?.visionGoalId ?? null
+  const visionNode = tree.find((n) => n.id === visionGoalId) ?? null
+  const displayTree = visionGoalId
+    ? tree.flatMap((n) => (n.id === visionGoalId ? n.children : [n]))
+    : tree
 
   const submitTask = async () => {
     await addTask(taskText)
@@ -124,13 +134,30 @@ export default function TodayTodoPage() {
         )}
       </section>
 
-      {/* === ゴール階層（スキルツリー） === */}
-      <section className="mt-10">
-        <hr className="mb-4 border-zinc-200" />
+      {/* === 大目標（絶対目標・ツリーには入れず別格でデカく） === */}
+      {visionNode && (
+        <section className="mt-10">
+          <hr className="border-zinc-200" />
+          <button
+            onClick={() => navigate(`/goals/${visionNode.id}`)}
+            className="block w-full py-5 text-left"
+          >
+            <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-amber-600">
+              <Compass className="h-4 w-4" /> 大目標
+            </div>
+            <div className="mt-1 text-2xl font-bold text-zinc-900 sm:text-3xl">{visionNode.title}</div>
+          </button>
+          <hr className="border-zinc-200" />
+        </section>
+      )}
+
+      {/* === ゴール階層（スキルツリー＝大目標の配下だけ） === */}
+      <section className={visionNode ? 'mt-6' : 'mt-10'}>
+        {!visionNode && <hr className="mb-4 border-zinc-200" />}
 
         {/* スキルツリー（ゴール階層） */}
         <GoalTree
-          tree={tree}
+          tree={displayTree}
           users={users}
           onToggleTask={toggleGoalTask}
           onAddTask={addGoalTask}

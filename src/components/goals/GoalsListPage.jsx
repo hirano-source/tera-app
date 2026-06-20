@@ -100,13 +100,7 @@ export default function GoalsListPage() {
               <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">
                 事業の大目標
               </div>
-              <div className="mt-0.5 truncate text-lg font-bold text-zinc-800">{visionGoal.title}</div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-100">
-                <div
-                  className="h-full rounded-full bg-amber-400 transition-all"
-                  style={{ width: `${visionGoal.progress ?? 0}%` }}
-                />
-              </div>
+              <div className="mt-0.5 truncate text-xl font-bold text-zinc-900">{visionGoal.title}</div>
             </div>
             <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-amber-300 group-hover:text-amber-500" />
           </div>

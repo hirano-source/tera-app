@@ -95,6 +95,8 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
           </button>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-3">
+            {/* 一番左＝担当者（主担当を大きく、残りはまとめて） */}
+            <AssigneeStack ids={node.assigneeIds} users={users} />
             {/* 状態ラベル：タップで 未着手→進行中→完了 を巡回 */}
             <StatusPill
               status={node.status}
@@ -110,7 +112,6 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
                 {node.title}
               </span>
             </button>
-            {owner && <Avatar user={owner} />}
           </div>
         )}
 
@@ -355,14 +356,39 @@ function ProgressBadge({ value }) {
   )
 }
 
-function Avatar({ user }) {
+function Avatar({ user, size = 'md', className = '' }) {
+  const s = { sm: 'h-4 w-4 text-[9px]', md: 'h-5 w-5 text-[10px]', lg: 'h-7 w-7 text-[12px]' }[size]
   return (
     <span
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+      className={cn('flex shrink-0 items-center justify-center rounded-full font-bold text-white', s, className)}
       style={{ backgroundColor: user.avatar_color || '#6d5dfc' }}
       title={user.name}
     >
       {(user.name || '?').charAt(0).toUpperCase()}
     </span>
+  )
+}
+
+// タスク左端の担当者表示：主担当を大きく、残りは小さく重ねてまとめる（多いと +N）。
+function AssigneeStack({ ids, users }) {
+  const list = (ids ?? []).map((id) => users[id]).filter(Boolean)
+  if (list.length === 0) {
+    return <span className="h-7 w-7 shrink-0 rounded-full border-2 border-dashed border-zinc-200" title="未割当" />
+  }
+  const [primary, ...rest] = list
+  const shown = rest.slice(0, 2)
+  const more = rest.length - shown.length
+  return (
+    <div className="flex shrink-0 items-center" title={list.map((u) => u.name).join('、')}>
+      <Avatar user={primary} size="lg" />
+      {shown.map((u) => (
+        <Avatar key={u.id} user={u} size="sm" className="-ml-1.5 ring-2 ring-white" />
+      ))}
+      {more > 0 && (
+        <span className="-ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-400 text-[9px] font-bold text-white ring-2 ring-white">
+          +{more}
+        </span>
+      )}
+    </div>
   )
 }

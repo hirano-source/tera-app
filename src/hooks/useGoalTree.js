@@ -14,15 +14,27 @@ export function useGoalTree() {
 
   const load = useCallback(async () => {
     if (!currentId) return
-    const [g, t, u, c] = await Promise.all([
+    const [g, t, u, c, a] = await Promise.all([
       supabase.from('goals').select('*').eq('workspace_id', currentId).order('created_at'),
       supabase.from('tasks').select('*').eq('workspace_id', currentId).order('created_at'),
       supabase.from('users').select('id,name,avatar_color'),
       supabase.from('comments').select('target_type,target_id').eq('workspace_id', currentId),
+      supabase.from('task_assignees').select('task_id,user_id').eq('workspace_id', currentId),
     ])
     const goals = g.data ?? []
     const tasks = t.data ?? []
     setUsers(Object.fromEntries((u.data ?? []).map((x) => [x.id, x])))
+
+    // タスクごとの担当者一覧（複数担当）。主担当(assignee_id)を先頭に並べる。
+    const assigneesByTask = {}
+    ;(a.data ?? []).forEach((r) => {
+      ;(assigneesByTask[r.task_id] ??= []).push(r.user_id)
+    })
+    const orderAssignees = (ta) => {
+      const ids = assigneesByTask[ta.id] ?? []
+      const rest = ids.filter((id) => id !== ta.assignee_id)
+      return ta.assignee_id ? [ta.assignee_id, ...rest] : rest
+    }
 
     // コメント数（ゴール/タスク別）
     const commentCount = {}
@@ -47,6 +59,7 @@ export function useGoalTree() {
       ...ta,
       kind: 'task',
       commentCount: commentCount[`task:${ta.id}`] ?? 0,
+      assigneeIds: orderAssignees(ta),
       // 2段目まで＝サブタスクの下はぶら下げない（allowChildren=false）
       children: allowChildren ? (subtasksByParent[ta.id] ?? []).map((st) => buildTask(st, false)) : [],
     })
