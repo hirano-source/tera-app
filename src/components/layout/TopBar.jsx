@@ -150,8 +150,8 @@ export default function TopBar({ onOpenBusiness }) {
         )}
       </div>
 
-      {/* 中央: 検索 */}
-      <div className="flex flex-1 justify-center px-3">
+      {/* 中央: 検索（min-w-0で必ず縮む＝右の更新ボタンを押し出さない） */}
+      <div className="flex min-w-0 flex-1 justify-center px-3">
         <SearchBox />
       </div>
 
@@ -159,7 +159,7 @@ export default function TopBar({ onOpenBusiness }) {
       <button
         onClick={() => window.location.reload()}
         title="更新（最新の状態に読み込み直す）"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-300 hover:bg-white/10 hover:text-white"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20"
       >
         <RefreshCw className="h-4 w-4" />
       </button>
