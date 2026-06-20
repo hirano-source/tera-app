@@ -60,13 +60,12 @@ export function WorkspaceProvider({ children }) {
     const sync = () => {
       if (!document.hidden) reload()
     }
+    // 省エネ：常時ポーリングはせず「アプリに戻ってきた時」だけ同期（手動は🔄ボタン）
     window.addEventListener('focus', sync)
     document.addEventListener('visibilitychange', sync)
-    const iv = setInterval(sync, 20000)
     return () => {
       window.removeEventListener('focus', sync)
       document.removeEventListener('visibilitychange', sync)
-      clearInterval(iv)
     }
   }, [user?.id, reload])
 

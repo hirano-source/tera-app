@@ -26,7 +26,8 @@ export function useAutoUpdate() {
     check()
     window.addEventListener('focus', check)
     document.addEventListener('visibilitychange', check)
-    const iv = setInterval(check, 60000)
+    // 省エネ：頻繁なポーリングはせず10分ごと＋「戻ってきた時」に新版チェック
+    const iv = setInterval(check, 600000)
     return () => {
       window.removeEventListener('focus', check)
       document.removeEventListener('visibilitychange', check)
