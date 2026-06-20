@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Mic, Square, Loader2 } from 'lucide-react'
+import { Headphones, Square, Loader2 } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { cn } from '../../utils/cn'
 
@@ -84,7 +84,7 @@ export default function RecordButton({ onResult }) {
       ) : recording ? (
         <Square className="h-4 w-4" />
       ) : (
-        <Mic className="h-4 w-4" />
+        <Headphones className="h-4 w-4" />
       )}
     </button>
   )

@@ -87,5 +87,13 @@ export function useGoal(goalId) {
     return data
   }
 
-  return { goal, loading, saveGoal }
+  // ゴールを削除（owner/adminのみRLSで許可）。子ゴール・成果物・チャットはcascade削除、
+  // タスクは goal_id が外れる（タスク自体は残る）。
+  const deleteGoal = async () => {
+    if (!goalId) return
+    const { error } = await supabase.from('goals').delete().eq('id', goalId)
+    if (error) throw error
+  }
+
+  return { goal, loading, saveGoal, deleteGoal }
 }

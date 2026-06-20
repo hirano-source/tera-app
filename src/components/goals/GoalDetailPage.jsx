@@ -29,7 +29,7 @@ import TaskMeta from '../tasks/TaskMeta'
 export default function GoalDetailPage() {
   const { goalId } = useParams()
   const navigate = useNavigate()
-  const { goal, loading, saveGoal } = useGoal(goalId)
+  const { goal, loading, saveGoal, deleteGoal } = useGoal(goalId)
   const { current, currentId } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
   const { items, available, busy, upload, download, remove } = useDeliverables(goalId)
@@ -116,6 +116,21 @@ export default function GoalDetailPage() {
       alert('保存に失敗しました: ' + (e?.message ?? e))
     } finally {
       setSavingInfo(false)
+    }
+  }
+
+  const removeGoal = async () => {
+    if (
+      !confirm(
+        `ゴール「${goal?.title}」を削除しますか？\n配下の子ゴール・成果物・チャットも一緒に削除されます（タスクは残り、ゴール紐づけが外れます）。元に戻せません。`,
+      )
+    )
+      return
+    try {
+      await deleteGoal()
+      navigate('/goals')
+    } catch (e) {
+      alert('ゴールの削除に失敗しました: ' + (e?.message ?? e))
     }
   }
 
@@ -367,6 +382,19 @@ export default function GoalDetailPage() {
               )}
             </div>
           </section>
+
+          {/* ゴール削除（owner/admin） */}
+          {canEdit && (
+            <div className="mt-6 border-t border-zinc-100 pt-4">
+              <button
+                onClick={removeGoal}
+                className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                このゴールを削除
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

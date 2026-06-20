@@ -211,6 +211,13 @@ export async function updateTask(
   return data
 }
 
+export async function deleteGoal(ctx: Ctx, { goalId }: { goalId: string }) {
+  // RLSで削除は owner/admin のみ。子ゴール・成果物・チャットはcascade、タスクは紐づけが外れる。
+  const { error } = await ctx.db.from('goals').delete().eq('id', goalId)
+  if (error) throw new Error(error.message)
+  return { deleted: goalId }
+}
+
 export async function addComment(
   ctx: Ctx,
   { targetType, targetId, body }: { targetType: string; targetId: string; body: string },

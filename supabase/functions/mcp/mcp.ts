@@ -88,6 +88,7 @@ const S = {
   },
   log: { type: 'object', properties: { type: { type: 'string' }, summary: { type: 'string' } }, required: ['type', 'summary'] },
   del: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
+  delGoal: { type: 'object', properties: { goalId: { type: 'string' } }, required: ['goalId'] },
   comment: {
     type: 'object',
     properties: {
@@ -173,6 +174,11 @@ const TOOLS: Record<string, Tool> = {
     description: 'タスクを削除する（owner/adminのみ。権限が無ければ何も起きない）。完了にするだけなら update_task の status=done を使う。',
     inputSchema: S.del,
     run: (ctx, a) => supa.deleteTask(ctx, a),
+  },
+  delete_goal: {
+    description: 'ゴールを削除する（owner/adminのみ）。子ゴール・成果物・チャットも消え、配下タスクは紐づけが外れる。',
+    inputSchema: S.delGoal,
+    run: (ctx, a) => supa.deleteGoal(ctx, a),
   },
   add_comment: {
     description: 'ゴール/タスクのスレッドにコメントを投稿する（「Claudeより」として確認・提案・議事録を残す）。チームの文脈がそのゴール/タスクに蓄積される。',

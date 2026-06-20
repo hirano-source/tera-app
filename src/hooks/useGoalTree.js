@@ -82,6 +82,13 @@ export function useGoalTree() {
     await load()
   }
 
+  // ゴールを削除（owner/adminのみRLSで許可）。子ゴール等はcascade、タスクは紐づけが外れる。
+  const deleteGoal = async (goalId) => {
+    if (!goalId) return
+    await supabase.from('goals').delete().eq('id', goalId)
+    await load()
+  }
+
   // ゴール配下にタスクを追加
   const addTask = async (goalId, title) => {
     const text = title.trim()
@@ -112,7 +119,7 @@ export function useGoalTree() {
     await supabase.from('tasks').update({ status: next }).eq('id', task.id)
   }
 
-  return { tree, users, loading, reload: load, createGoal, addTask, toggleTask, assignOwner }
+  return { tree, users, loading, reload: load, createGoal, addTask, toggleTask, assignOwner, deleteGoal }
 }
 
 // ツリー内の該当タスクの status を差し替える（楽観的更新）

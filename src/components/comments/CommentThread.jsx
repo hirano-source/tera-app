@@ -3,6 +3,7 @@ import { Send, Check, RotateCcw } from 'lucide-react'
 import { useComments } from '../../hooks/useComments'
 import { cn } from '../../utils/cn'
 import RecordButton from './RecordButton'
+import MicButton from '../common/MicButton'
 
 // ゴール/タスクのコメントスレッド（会話・相談・議事録の蓄積）。
 // 投稿・解決済みトグル・@メンション（指名→通知）ができる。
@@ -114,14 +115,15 @@ export default function CommentThread({ targetType, targetId, members = [], clas
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <MicButton onText={(text) => setDraft((d) => (d ? d + ' ' : '') + text)} />
           <RecordButton onResult={(summary) => summary && addComment(summary)} />
           <input
             ref={inputRef}
             value={draft}
             onChange={onChange}
             onKeyDown={(e) => e.key === 'Enter' && mentionQuery === null && send()}
-            placeholder="コメント・議事録を入力（@で指名 / 🎤で録音→要約投稿）…"
+            placeholder="入力（🎤音声 / 🎧録音で議事録 / @で指名）…"
             className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
           />
           <button

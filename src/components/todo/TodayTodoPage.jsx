@@ -20,6 +20,7 @@ export default function TodayTodoPage() {
     addTask: addGoalTask,
     toggleTask: toggleGoalTask,
     assignOwner,
+    deleteGoal,
     reload: reloadTree,
   } = useGoalTree()
   const [addingTask, setAddingTask] = useState(false)
@@ -148,6 +149,7 @@ export default function TodayTodoPage() {
           onAddGoal={createGoal}
           onAssignOwner={assignOwner}
           onOpenTask={(node) => setOpenTaskId(node.id)}
+          onDeleteGoal={deleteGoal}
           canEditGoals={canEditGoals}
         />
 

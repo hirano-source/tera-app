@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronRight, Play, Check,
-  ListPlus, GitBranchPlus, Maximize2, Users, X, MessageSquare,
+  ListPlus, GitBranchPlus, Maximize2, Users, X, MessageSquare, Trash2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import TaskMeta from '../tasks/TaskMeta'
 
 // スキルツリー：ゴール/タスクのノードを接続線付きで再帰表示する。
 // canEditGoals=false（メンバー）はゴールの追加・担当割当を出さない（タスクは全員可）。
-export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, canEditGoals = true }) {
+export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals = true }) {
   return (
     <div>
       {tree.map((node) => (
@@ -23,6 +23,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
           onAddGoal={onAddGoal}
           onAssignOwner={onAssignOwner}
           onOpenTask={onOpenTask}
+          onDeleteGoal={onDeleteGoal}
           canEditGoals={canEditGoals}
         />
       ))}
@@ -30,7 +31,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
   )
 }
 
-function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, canEditGoals }) {
+function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals }) {
   const navigate = useNavigate()
   const isGoal = node.kind === 'goal'
   const children = node.children ?? []
@@ -168,6 +169,17 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             <ToolButton title="詳細を開く" onClick={() => navigate(`/goals/${node.id}`)}>
               <Maximize2 className="h-4 w-4" />
             </ToolButton>
+            {canEditGoals && onDeleteGoal && (
+              <ToolButton
+                title="ゴールを削除"
+                onClick={() => {
+                  if (confirm(`ゴール「${node.title}」を削除しますか？\n子ゴール・成果物・チャットも削除されます。元に戻せません。`))
+                    onDeleteGoal(node.id)
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </ToolButton>
+            )}
           </div>
         )}
 
@@ -193,6 +205,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
               onAddGoal={onAddGoal}
               onAssignOwner={onAssignOwner}
               onOpenTask={onOpenTask}
+              onDeleteGoal={onDeleteGoal}
               canEditGoals={canEditGoals}
             />
           ))}
