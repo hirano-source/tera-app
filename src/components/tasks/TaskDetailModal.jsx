@@ -9,7 +9,7 @@ import { cn } from '../../utils/cn'
 // 入力は基本Claude(MCP)が埋める想定だが、ここで人が直接いじることもできる。
 const STATUS = [
   { v: 'todo', label: '未着手' },
-  { v: 'doing', label: '着手' },
+  { v: 'doing', label: '進行中' },
   { v: 'blocked', label: '待ち（詰まり）' },
   { v: 'done', label: '完了' },
 ]

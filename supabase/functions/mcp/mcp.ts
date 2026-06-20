@@ -39,6 +39,7 @@ const S = {
       assigneeId: { type: 'string', description: '担当者のid（未指定なら自分）' },
       isToday: { type: 'boolean', description: '今日のToDoにするか' },
       goalId: { type: 'string', description: '紐づけるゴールのid（任意）' },
+      parentTaskId: { type: 'string', description: '親タスクのid（指定でサブタスク。ゴール→タスク→タスクの2段まで）' },
       priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'], description: 'P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか' },
       dueDate: { type: 'string', description: '完了期限 YYYY-MM-DD' },
       startDueDate: { type: 'string', description: '着手期限 YYYY-MM-DD' },

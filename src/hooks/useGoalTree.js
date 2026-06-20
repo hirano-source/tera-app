@@ -35,30 +35,32 @@ export function useGoalTree() {
     goals.forEach((go) => {
       ;(goalsByParent[go.parent_id] ??= []).push(go)
     })
-    const tasksByGoal = {}
+    // 直下タスク（親タスク無し）はゴールに、サブタスクは親タスクにぶら下げる
+    const topTasksByGoal = {}
+    const subtasksByParent = {}
     tasks.forEach((ta) => {
-      if (ta.goal_id) (tasksByGoal[ta.goal_id] ??= []).push(ta)
+      if (ta.parent_task_id) (subtasksByParent[ta.parent_task_id] ??= []).push(ta)
+      else if (ta.goal_id) (topTasksByGoal[ta.goal_id] ??= []).push(ta)
+    })
+
+    const buildTask = (ta, allowChildren) => ({
+      ...ta,
+      kind: 'task',
+      commentCount: commentCount[`task:${ta.id}`] ?? 0,
+      // 2段目まで＝サブタスクの下はぶら下げない（allowChildren=false）
+      children: allowChildren ? (subtasksByParent[ta.id] ?? []).map((st) => buildTask(st, false)) : [],
     })
 
     const build = (parentId) =>
-      (goalsByParent[parentId] ?? []).map((go) => {
-        const goalTasks = tasksByGoal[go.id] ?? []
-        return {
-          ...go,
-          kind: 'goal',
-          commentCount: commentCount[`goal:${go.id}`] ?? 0,
-          taskDone: goalTasks.filter((x) => x.status === 'done').length,
-          taskTotal: goalTasks.length,
-          children: [
-            ...build(go.id),
-            ...goalTasks.map((ta) => ({
-              ...ta,
-              kind: 'task',
-              commentCount: commentCount[`task:${ta.id}`] ?? 0,
-            })),
-          ],
-        }
-      })
+      (goalsByParent[parentId] ?? []).map((go) => ({
+        ...go,
+        kind: 'goal',
+        commentCount: commentCount[`goal:${go.id}`] ?? 0,
+        children: [
+          ...build(go.id),
+          ...(topTasksByGoal[go.id] ?? []).map((ta) => buildTask(ta, true)),
+        ],
+      }))
 
     setTree(build(null))
     setLoading(false)
@@ -89,13 +91,14 @@ export function useGoalTree() {
     await load()
   }
 
-  // ゴール配下にタスクを追加
-  const addTask = async (goalId, title) => {
+  // ゴール配下にタスクを追加（parentTaskId 指定でサブタスク。goal_idは親と同じ）
+  const addTask = async (goalId, title, parentTaskId = null) => {
     const text = title.trim()
     if (!text || !currentId) return
     await supabase.from('tasks').insert({
       workspace_id: currentId,
       goal_id: goalId,
+      parent_task_id: parentTaskId,
       assignee_id: user?.id ?? null,
       title: text,
       is_today: false,
@@ -112,9 +115,10 @@ export function useGoalTree() {
     await supabase.from('goals').update({ owner_id: ownerId }).eq('id', goalId)
   }
 
-  // タスク完了/未完了トグル
+  // タスクの状態をタップで巡回：未着手→進行中→完了→未着手（blockedは未着手へ）
+  const CYCLE = { todo: 'doing', doing: 'done', done: 'todo', blocked: 'todo' }
   const toggleTask = async (task) => {
-    const next = task.status === 'done' ? 'todo' : 'done'
+    const next = CYCLE[task.status] ?? 'doing'
     setTree((prev) => toggleInTree(prev, task.id, next))
     await supabase.from('tasks').update({ status: next }).eq('id', task.id)
   }

@@ -148,6 +148,7 @@ export async function updateGoal(
 
 type TaskFields = {
   goalId?: string | null
+  parentTaskId?: string | null
   priority?: string
   dueDate?: string | null
   startDueDate?: string | null
@@ -162,6 +163,7 @@ type TaskFields = {
 // camelCase の追加項目を tasks の列(snake_case)に詰める共通処理。
 function applyTaskFields(row: Record<string, unknown>, a: TaskFields) {
   if (a.goalId !== undefined) row.goal_id = a.goalId
+  if (a.parentTaskId !== undefined) row.parent_task_id = a.parentTaskId
   if (a.priority !== undefined) row.priority = a.priority
   if (a.dueDate !== undefined) row.due_date = a.dueDate
   if (a.startDueDate !== undefined) row.start_due_date = a.startDueDate

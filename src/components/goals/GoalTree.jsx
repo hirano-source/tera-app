@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ChevronDown, ChevronRight, Play, Check,
+  ChevronDown, ChevronRight, Play, Check, Pause,
   ListPlus, GitBranchPlus, Maximize2, Users, X, MessageSquare, Trash2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
@@ -42,18 +42,27 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const owner = isGoal ? users[node.owner_id] : users[node.assignee_id]
+  const taskCount = isGoal ? countOwnTasks(node) : null
+  // ゴールの進捗％＝タスク完了から自動計算（タスクが無ければ手入力progress）
+  const goalPct =
+    taskCount && taskCount.total > 0
+      ? Math.round((taskCount.done / taskCount.total) * 100)
+      : node.progress ?? 0
 
   const startAdd = (mode) => {
     setAddMode(mode)
     setOpen(true)
   }
 
-  // 入力確定：モードに応じて このゴール配下に タスク or 子ゴール を作る
+  const isSubtask = !isGoal && !!node.parent_task_id
+
+  // 入力確定：ゴール→子ゴール/タスク、タスク→サブタスク（goal_idは親と同じ）
   const submitAdd = async () => {
     const t = text.trim()
     if (t) {
       if (addMode === 'goal') await onAddGoal(t, node.id)
-      else await onAddTask(node.id, t)
+      else if (isGoal) await onAddTask(node.id, t)
+      else await onAddTask(node.goal_id, t, node.id)
     }
     setText('')
     setAddMode(null)
@@ -80,46 +89,38 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             onClick={() => navigate(`/goals/${node.id}`)}
             className="flex min-w-0 flex-1 items-center gap-3 text-left"
           >
-            <ProgressBadge value={node.progress ?? 0} />
+            <ProgressBadge value={goalPct} />
             <span className="truncate text-sm font-medium text-zinc-800">{node.title}</span>
             {owner && <Avatar user={owner} />}
           </button>
         ) : (
-          <button
-            onClick={() => onToggleTask(node)}
-            className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          >
-            <span
-              className={cn(
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                node.status === 'done' ? 'bg-emerald-500 text-white' : 'bg-brand text-white',
-              )}
-            >
-              {node.status === 'done' ? (
-                <Check className="h-3.5 w-3.5" strokeWidth={3} />
-              ) : (
-                <Play className="h-3 w-3 translate-x-0.5 fill-white" />
-              )}
-            </span>
-            <span
-              className={cn(
-                'truncate text-sm',
-                node.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700',
-              )}
-            >
-              {node.title}
-            </span>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {/* 状態アイコン：タップで 未着手→進行中→完了 を巡回 */}
+            <StatusCircle
+              status={node.status}
+              onClick={() => onToggleTask(node)}
+            />
+            <button onClick={() => onOpenTask?.(node)} className="min-w-0 flex-1 text-left">
+              <span
+                className={cn(
+                  'truncate text-sm',
+                  node.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700',
+                )}
+              >
+                {node.title}
+              </span>
+            </button>
             {owner && <Avatar user={owner} />}
-          </button>
+          </div>
         )}
 
-        {/* メタ：ゴールは完了数/全体＋コメント数、タスクは優先度/期日/状態/コメント数 */}
+        {/* メタ：ゴールは完了数/全体（動的に集計＝完了で動く）＋コメント数、タスクは優先度等 */}
         {isGoal
-          ? (node.taskTotal > 0 || node.commentCount > 0) && (
+          ? (taskCount.total > 0 || node.commentCount > 0) && (
               <span className="flex shrink-0 items-center gap-2 text-xs text-zinc-400">
-                {node.taskTotal > 0 && (
+                {taskCount.total > 0 && (
                   <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
-                    {node.taskDone}/{node.taskTotal}
+                    {taskCount.done}/{taskCount.total}
                   </span>
                 )}
                 {node.commentCount > 0 && (
@@ -183,11 +184,20 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
           </div>
         )}
 
-        {/* タスク：詳細を開く（常時表示＝スマホのタップでも届く） */}
-        {!isGoal && onOpenTask && (
-          <ToolButton title="詳細を開く" onClick={() => onOpenTask(node)}>
-            <Maximize2 className="h-4 w-4" />
-          </ToolButton>
+        {/* タスク：サブタスク追加（上位タスクのみ）＋詳細（常時表示＝スマホのタップでも届く） */}
+        {!isGoal && (
+          <div className="flex items-center gap-1">
+            {!isSubtask && (
+              <ToolButton title="サブタスクを追加" onClick={() => startAdd('task')}>
+                <ListPlus className="h-4 w-4" />
+              </ToolButton>
+            )}
+            {onOpenTask && (
+              <ToolButton title="詳細を開く" onClick={() => onOpenTask(node)}>
+                <Maximize2 className="h-4 w-4" />
+              </ToolButton>
+            )}
+          </div>
         )}
       </div>
 
@@ -280,6 +290,43 @@ function ToolButton({ title, onClick, children }) {
       {children}
     </button>
   )
+}
+
+// タスクの状態アイコン（タップで巡回）。未着手=空丸 / 進行中=▶ / 完了=✓ / 待ち=‖
+const STATUS_VISUAL = {
+  todo: { label: '未着手', cls: 'border-2 border-zinc-300 bg-white', icon: null },
+  doing: { label: '進行中', cls: 'bg-brand text-white', icon: <Play className="h-3 w-3 translate-x-0.5 fill-white" /> },
+  done: { label: '完了', cls: 'bg-emerald-500 text-white', icon: <Check className="h-3.5 w-3.5" strokeWidth={3} /> },
+  blocked: { label: '待ち', cls: 'bg-amber-400 text-white', icon: <Pause className="h-3 w-3 fill-white" /> },
+}
+
+function StatusCircle({ status, onClick }) {
+  const v = STATUS_VISUAL[status] ?? STATUS_VISUAL.todo
+  return (
+    <button
+      onClick={onClick}
+      title={`${v.label}（タップで切替）`}
+      className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors', v.cls)}
+    >
+      {v.icon}
+    </button>
+  )
+}
+
+// ゴール直下のタスク（サブタスク含む・サブゴールは含めない）の done/total を集計
+function countOwnTasks(node) {
+  let done = 0
+  let total = 0
+  for (const c of node.children ?? []) {
+    if (c.kind === 'task') {
+      total++
+      if (c.status === 'done') done++
+      const sub = countOwnTasks(c)
+      done += sub.done
+      total += sub.total
+    }
+  }
+  return { done, total }
 }
 
 function ProgressBadge({ value }) {
