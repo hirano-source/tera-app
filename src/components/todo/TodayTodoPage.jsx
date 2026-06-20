@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Settings2, HelpCircle, Check, ChevronRight, Trash2 } from 'lucide-react'
+import { Plus, Check, ChevronRight, Trash2 } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -124,21 +124,9 @@ export default function TodayTodoPage() {
         )}
       </section>
 
-      {/* === 今やるべきゴール === */}
+      {/* === ゴール階層（スキルツリー） === */}
       <section className="mt-10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">今やるべきゴール</h2>
-          <div className="flex items-center gap-3">
-            <button className="text-zinc-400 hover:text-zinc-600">
-              <Settings2 className="h-5 w-5" />
-            </button>
-            <button className="text-zinc-400 hover:text-zinc-600">
-              <HelpCircle className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        <hr className="my-4 border-zinc-200" />
+        <hr className="mb-4 border-zinc-200" />
 
         {/* スキルツリー（ゴール階層） */}
         <GoalTree

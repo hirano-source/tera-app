@@ -144,10 +144,7 @@ export default function GoalsListPage() {
       )}
 
       {/* 大目標の下のゴール */}
-      <div className="mt-6 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-500">
-          {visionGoal ? 'この大目標の下のゴール' : 'ゴール'}
-        </h2>
+      <div className="mt-6 flex items-center justify-end">
         <button
           onClick={() => setAdding((v) => !v)}
           className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:opacity-90"
