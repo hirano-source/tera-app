@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, Check, Plus, Trash2, Settings } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import SearchBox from './SearchBox'
+import teraSymbol from '../../assets/TERA_Symbol_Nega.png'
 
 // 上部バー（ダーク）。左に事業（ワークスペース）切替、中央に検索、右にポイント。
 export default function TopBar({ onOpenBusiness }) {
@@ -48,6 +49,20 @@ export default function TopBar({ onOpenBusiness }) {
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="flex h-[60px] items-center gap-3 px-4">
+      {/* ロゴ（タップで事業設定）。スマホでもここから入れる */}
+      <button
+        onClick={() => onOpenBusiness?.()}
+        title="事業設定（ロゴ・大目標・事業名・削除）"
+        className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg hover:bg-white/10"
+      >
+        {current?.logoUrl ? (
+          <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded bg-white p-0.5">
+            <img src={current.logoUrl} alt="" className="h-full w-full object-contain" />
+          </span>
+        ) : (
+          <img src={teraSymbol} alt="TERA" className="h-7 w-7 object-contain" />
+        )}
+      </button>
       {/* 左: ワークスペース切替 */}
       <div className="relative shrink-0">
         <button

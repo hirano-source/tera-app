@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Target, Trash2, Check, ExternalLink, Plus } from 'lucide-react'
+import { X, Target, Trash2, Check, ExternalLink, Plus, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { useWorkspace } from '../../hooks/useWorkspace'
 
 // 事業設定（左上ロゴ／事業ドロップダウンから開く）。
 // 事業の大目標（北極星）・事業名の変更・事業の削除を1か所に集約。
 export default function BusinessSettingsModal({ open, onClose }) {
-  const { current, currentId, workspaces, renameBusiness, setVisionGoal, deleteBusiness, user } = useWorkspace()
+  const { current, currentId, workspaces, renameBusiness, setVisionGoal, deleteBusiness, uploadLogo, removeLogo, user } =
+    useWorkspace()
   const navigate = useNavigate()
   const canEdit = ['owner', 'admin'].includes(current?.role)
   const isOwner = current?.role === 'owner'
@@ -15,6 +16,21 @@ export default function BusinessSettingsModal({ open, onClose }) {
   const [vision, setVision] = useState(null) // {id,title} | null
   const [newVision, setNewVision] = useState('')
   const [busy, setBusy] = useState(false)
+  const logoRef = useRef(null)
+
+  const onPickLogo = async (e) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    setBusy(true)
+    try {
+      await uploadLogo(currentId, f)
+    } catch (err) {
+      alert('ロゴのアップロードに失敗しました: ' + (err?.message ?? err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (!open || !current) return
@@ -141,6 +157,42 @@ export default function BusinessSettingsModal({ open, onClose }) {
                 </button>
               )}
             </div>
+          </section>
+
+          {/* ロゴ */}
+          <section>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">ロゴ</label>
+            <div className="flex items-center gap-3">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+                {current.logoUrl ? (
+                  <img src={current.logoUrl} alt="logo" className="h-full w-full object-contain" />
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-zinc-300" />
+                )}
+              </div>
+              {canEdit && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => logoRef.current?.click()}
+                    disabled={busy}
+                    className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-40"
+                  >
+                    {current.logoUrl ? 'ロゴを変更' : 'ロゴを設定'}
+                  </button>
+                  {current.logoUrl && (
+                    <button
+                      onClick={() => removeLogo(currentId)}
+                      disabled={busy}
+                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-50 disabled:opacity-40"
+                    >
+                      削除
+                    </button>
+                  )}
+                  <input ref={logoRef} type="file" accept="image/*" onChange={onPickLogo} className="hidden" />
+                </div>
+              )}
+            </div>
+            <p className="mt-1.5 text-xs text-zinc-400">左上やヘッダーに表示されます（PNG/SVG等の画像）。</p>
           </section>
 
           {/* 大目標 */}

@@ -17,7 +17,7 @@ export function WorkspaceProvider({ children }) {
     if (!user?.id) return
     const { data: mems } = await supabase
       .from('memberships')
-      .select('role, workspaces(id,name,vision_goal_id)')
+      .select('role, workspaces(id,name,vision_goal_id,logo_url)')
       .eq('user_id', user.id)
     const list = (mems ?? [])
       .filter((m) => m.workspaces)
@@ -25,6 +25,7 @@ export function WorkspaceProvider({ children }) {
         id: m.workspaces.id,
         name: m.workspaces.name,
         visionGoalId: m.workspaces.vision_goal_id,
+        logoUrl: m.workspaces.logo_url,
         role: m.role,
       }))
     setWorkspaces(list)
@@ -81,6 +82,23 @@ export function WorkspaceProvider({ children }) {
     await reload()
   }
 
+  // 事業ロゴをアップロードして設定（公開バケット branding）
+  const uploadLogo = async (id, file) => {
+    const path = `${id}/logo_${Date.now()}_${file.name}`
+    const up = await supabase.storage.from('branding').upload(path, file, { upsert: true })
+    if (up.error) throw up.error
+    const { data } = supabase.storage.from('branding').getPublicUrl(path)
+    const { error } = await supabase.rpc('set_business_logo', { p_workspace_id: id, p_url: data.publicUrl })
+    if (error) throw error
+    await reload()
+  }
+
+  const removeLogo = async (id) => {
+    const { error } = await supabase.rpc('set_business_logo', { p_workspace_id: id, p_url: null })
+    if (error) throw error
+    await reload()
+  }
+
   const current = workspaces.find((w) => w.id === currentId) ?? null
   const display = profile ?? { name: user?.email ?? '', avatar_color: '#6d5dfc' }
 
@@ -93,6 +111,8 @@ export function WorkspaceProvider({ children }) {
     deleteBusiness,
     renameBusiness,
     setVisionGoal,
+    uploadLogo,
+    removeLogo,
     reload,
     user: {
       id: profile?.id,
