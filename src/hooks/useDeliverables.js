@@ -56,12 +56,39 @@ export function useDeliverables(goalId) {
     }
   }
 
-  const download = async (item) => {
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(item.storage_path, 60)
+  // リンク成果物を追加（動画はYouTube/Drive等のURLを貼る。容量を食わない）
+  const addLink = async (url, name) => {
+    const u = (url || '').trim()
+    if (!u || !goalId || !currentId) return
+    const href = /^https?:\/\//i.test(u) ? u : `https://${u}`
+    setBusy(true)
+    try {
+      const { error } = await supabase.from('deliverables').insert({
+        workspace_id: currentId,
+        goal_id: goalId,
+        name: (name || '').trim() || href,
+        url: href,
+        kind: 'link',
+        uploaded_by: user?.id ?? null,
+      })
+      if (error) throw error
+      await load()
+    } catch (e) {
+      alert('リンクの追加に失敗しました: ' + (e.message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 開く：リンクはそのURL、ファイルは署名付きURL
+  const open = async (item) => {
+    if (item.url) {
+      window.open(item.url, '_blank')
+      return
+    }
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(item.storage_path, 60)
     if (error) {
-      alert('ダウンロードに失敗しました: ' + error.message)
+      alert('開けませんでした: ' + error.message)
       return
     }
     window.open(data.signedUrl, '_blank')
@@ -69,10 +96,10 @@ export function useDeliverables(goalId) {
 
   const remove = async (item) => {
     if (!confirm(`「${item.name}」を削除しますか？`)) return
-    await supabase.storage.from(BUCKET).remove([item.storage_path])
+    if (item.storage_path) await supabase.storage.from(BUCKET).remove([item.storage_path])
     await supabase.from('deliverables').delete().eq('id', item.id)
     await load()
   }
 
-  return { items, available, busy, upload, download, remove }
+  return { items, available, busy, upload, addLink, open, remove }
 }

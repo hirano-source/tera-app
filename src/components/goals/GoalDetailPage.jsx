@@ -13,6 +13,8 @@ import {
   FileText,
   Check,
   Play,
+  Link2,
+  ExternalLink,
 } from 'lucide-react'
 import { useGoal } from '../../hooks/useGoals'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -32,7 +34,7 @@ export default function GoalDetailPage() {
   const { goal, loading, saveGoal, deleteGoal } = useGoal(goalId)
   const { current, currentId } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
-  const { items, available, busy, upload, download, remove } = useDeliverables(goalId)
+  const { items, available, busy, upload, addLink, open: openItem, remove } = useDeliverables(goalId)
   const { tasks, addTask, toggleTask, deleteTask, reload: reloadTasks } = useGoalTasks(goalId)
 
   const fileRef = useRef(null)
@@ -41,6 +43,9 @@ export default function GoalDetailPage() {
   const [dragOver, setDragOver] = useState(false)
   const [newTask, setNewTask] = useState('')
   const [openTaskId, setOpenTaskId] = useState(null)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkName, setLinkName] = useState('')
 
   // ゴール情報（理想/現状/差/完了基準/期日/担当）の編集フォーム
   const [info, setInfo] = useState({ ideal_state: '', current: '', gap: '', criteria: '', due_date: '', owner_id: '' })
@@ -162,6 +167,14 @@ export default function GoalDetailPage() {
     if (!v) return
     await addTask(v)
     setNewTask('')
+  }
+  const submitLink = async () => {
+    const u = linkUrl.trim()
+    if (!u) return
+    await addLink(u, linkName)
+    setLinkUrl('')
+    setLinkName('')
+    setLinkOpen(false)
   }
 
   return (
@@ -338,12 +351,48 @@ export default function GoalDetailPage() {
                   <ArrowUpDown className="h-4 w-4" />
                   {asc ? '名前↑' : '名前↓'}
                 </button>
+                <button
+                  onClick={() => setLinkOpen((v) => !v)}
+                  disabled={!available || busy}
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
+                >
+                  <Link2 className="h-4 w-4" />
+                  リンク追加
+                </button>
                 <button onClick={() => fileRef.current?.click()} disabled={!available || busy} className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
                   <Plus className="h-4 w-4" />
-                  {busy ? 'アップロード中…' : '新規作成'}
+                  {busy ? 'アップロード中…' : 'ファイル'}
                 </button>
                 <input ref={fileRef} type="file" onChange={onPick} className="hidden" />
               </div>
+
+              {/* リンクで追加（動画はYouTube/Drive等のURLを貼る＝容量を食わない） */}
+              {linkOpen && available && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                  <input
+                    autoFocus
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitLink()}
+                    placeholder="URL（https://… 動画・Drive等）"
+                    className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500"
+                  />
+                  <input
+                    value={linkName}
+                    onChange={(e) => setLinkName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitLink()}
+                    placeholder="表示名（任意）"
+                    className="w-40 rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500"
+                  />
+                  <button
+                    onClick={submitLink}
+                    disabled={!linkUrl.trim() || busy}
+                    className="shrink-0 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                  >
+                    追加
+                  </button>
+                </div>
+              )}
 
               {!available ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -367,11 +416,17 @@ export default function GoalDetailPage() {
                 <ul className="mt-3 divide-y divide-zinc-100">
                   {shown.map((d) => (
                     <li key={d.id} className="flex items-center gap-2 py-2.5 text-sm">
-                      <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
-                      <span className="min-w-0 flex-1 truncate text-zinc-700">{d.name}</span>
+                      {d.url ? (
+                        <Link2 className="h-4 w-4 shrink-0 text-brand" />
+                      ) : (
+                        <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
+                      )}
+                      <button onClick={() => openItem(d)} className="min-w-0 flex-1 truncate text-left text-zinc-700 hover:underline">
+                        {d.name}
+                      </button>
                       <span className="hidden shrink-0 text-xs text-zinc-400 sm:block">{fmt(d.created_at)}</span>
-                      <button onClick={() => download(d)} title="ダウンロード" className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
-                        <Download className="h-4 w-4" />
+                      <button onClick={() => openItem(d)} title={d.url ? '開く' : 'ダウンロード'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
+                        {d.url ? <ExternalLink className="h-4 w-4" /> : <Download className="h-4 w-4" />}
                       </button>
                       <button onClick={() => remove(d)} title="削除" className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500">
                         <Trash2 className="h-4 w-4" />
