@@ -14,13 +14,14 @@ const INSTRUCTIONS = `TERA（目標達成型タスク管理）のMCP。コネク
 
 タスクは create_task / update_task、ゴールは create_goal で操作。権限の無い操作はサーバが拒否する。
 
-タスクを作る/更新するときは、ただのタイトルで終わらせず、可能なら次の項目まで一緒に提案して埋めること（これがTERAの肝）：
+ゴールもタスクも「理想の状態 → 現状 → その差 →（手）」の型で考える。タスクを作る/更新するときは、ただのタイトルで終わらせず、可能なら次まで一緒に提案して埋めること（これがTERAの肝）：
+- idealState（理想の状態＝終わったらどうなってるか）/ currentState（現状）/ gap（その差＝詰まり・足りないもの）
+- approach（やること＝差を埋める具体的な一手）
 - priority（P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか）
-- completionCriteria（完了の基準＝「何ができたら完了か」を一文で）
-- approach（最初の一歩・やり方を1つ）
 - startDueDate（着手期限）/ dueDate（完了期限）
 - recurrence（毎日/毎週/毎月のルーティンなら指定。突発・1回限りの重点案件は省略）
 - goalId（関連するゴールがあれば紐づける）
+ゴールの理想/現状/差/完了基準は update_goal で埋める。
 詰まったタスクは status=blocked にし、blockerType（data/approval/reply/external）・blockerOwner（誰待ち）・blockerNote を入れる。
 
 作業の確認・提案・議事録は add_comment でそのゴール/タスクのスレッドに残す（＝「Claudeより」。チームの文脈がそこに蓄積される）。作業前は list_comments で経緯を読むとよい。`
@@ -41,8 +42,10 @@ const S = {
       priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'], description: 'P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか' },
       dueDate: { type: 'string', description: '完了期限 YYYY-MM-DD' },
       startDueDate: { type: 'string', description: '着手期限 YYYY-MM-DD' },
-      completionCriteria: { type: 'string', description: '完了の基準（doneの定義）' },
-      approach: { type: 'string', description: '最初の一歩・やり方（1つ）' },
+      idealState: { type: 'string', description: '理想の状態（終わったらどうなってるか）' },
+      currentState: { type: 'string', description: '現状（今どうなってるか）' },
+      gap: { type: 'string', description: 'その差（理想と現状のギャップ＝詰まり・足りないもの）' },
+      approach: { type: 'string', description: 'やること（差を埋める具体的な一手）' },
       recurrence: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'ルーティンなら指定。重点案件は省略' },
     },
     required: ['title'],
@@ -57,14 +60,31 @@ const S = {
       priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'] },
       dueDate: { type: 'string', description: '完了期限 YYYY-MM-DD' },
       startDueDate: { type: 'string', description: '着手期限 YYYY-MM-DD' },
-      completionCriteria: { type: 'string' },
-      approach: { type: 'string' },
+      idealState: { type: 'string', description: '理想の状態' },
+      currentState: { type: 'string', description: '現状' },
+      gap: { type: 'string', description: 'その差' },
+      approach: { type: 'string', description: 'やること' },
       recurrence: { type: 'string', enum: ['daily', 'weekly', 'monthly'] },
       blockerType: { type: 'string', enum: ['data', 'approval', 'reply', 'external'], description: '詰まりの種類' },
       blockerOwner: { type: 'string', description: '誰待ちか' },
       blockerNote: { type: 'string' },
     },
     required: ['taskId'],
+  },
+  updateGoal: {
+    type: 'object',
+    properties: {
+      goalId: { type: 'string' },
+      title: { type: 'string' },
+      idealState: { type: 'string', description: '理想の状態' },
+      current: { type: 'string', description: '現状' },
+      gap: { type: 'string', description: 'その差' },
+      criteria: { type: 'string', description: '完了の基準' },
+      dueDate: { type: 'string', description: '期日 YYYY-MM-DD' },
+      ownerId: { type: 'string', description: '担当のユーザーid' },
+      progress: { type: 'number', description: '進捗 0-100' },
+    },
+    required: ['goalId'],
   },
   log: { type: 'object', properties: { type: { type: 'string' }, summary: { type: 'string' } }, required: ['type', 'summary'] },
   del: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
@@ -116,9 +136,14 @@ const TOOLS: Record<string, Tool> = {
     run: (ctx, a) => supa.getActivityLog(ctx, a),
   },
   create_goal: {
-    description: 'ゴールを作る。parentId 指定で配下にぶら下げる（階層）。',
+    description: 'ゴールを作る。parentId 指定で配下にぶら下げる（階層）。中身は update_goal で埋める。',
     inputSchema: S.createGoal,
     run: (ctx, a) => supa.createGoal(ctx, a),
+  },
+  update_goal: {
+    description: 'ゴールの中身を更新する。理想の状態(idealState)/現状(current)/その差(gap)/完了の基準(criteria)/期日/担当/進捗/タイトル。owner/adminのみ。',
+    inputSchema: S.updateGoal,
+    run: (ctx, a) => supa.updateGoal(ctx, a),
   },
   create_task: {
     description: 'タスクを作る。タイトルだけでなく priority/completionCriteria/approach/期限/recurrence/goalId まで埋めるのが望ましい。assigneeId 未指定なら自分担当。',

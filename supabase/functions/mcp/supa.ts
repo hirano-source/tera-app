@@ -75,8 +75,10 @@ export async function getContext(ctx: Ctx) {
 
 export async function listGoals(ctx: Ctx) {
   const { data } = await ctx.db
-    .from('goals').select('id,title,horizon,parent_id,progress,criteria')
-    .eq('workspace_id', ctx.workspaceId).order('created_at')
+    .from('goals')
+    .select('id,title,horizon,parent_id,progress,ideal_state,current,gap,criteria,due_date,owner_id')
+    .eq('workspace_id', ctx.workspaceId)
+    .order('created_at')
   return data ?? []
 }
 
@@ -115,13 +117,45 @@ export async function createGoal(ctx: Ctx, { title, parentId = null }: { title: 
   return data
 }
 
+// ゴールの中身を更新（理想/現状/差/完了基準/期日/担当/進捗/タイトル）。owner/adminのみRLSで許可。
+export async function updateGoal(
+  ctx: Ctx,
+  a: {
+    goalId: string
+    title?: string
+    idealState?: string
+    current?: string
+    gap?: string
+    criteria?: string
+    dueDate?: string | null
+    ownerId?: string | null
+    progress?: number
+  },
+) {
+  const patch: Record<string, unknown> = {}
+  if (a.title !== undefined) patch.title = a.title
+  if (a.idealState !== undefined) patch.ideal_state = a.idealState
+  if (a.current !== undefined) patch.current = a.current
+  if (a.gap !== undefined) patch.gap = a.gap
+  if (a.criteria !== undefined) patch.criteria = a.criteria
+  if (a.dueDate !== undefined) patch.due_date = a.dueDate
+  if (a.ownerId !== undefined) patch.owner_id = a.ownerId
+  if (a.progress !== undefined) patch.progress = a.progress
+  const { data, error } = await ctx.db.from('goals').update(patch).eq('id', a.goalId).select().maybeSingle()
+  if (error) throw new Error(error.message)
+  return data
+}
+
 type TaskFields = {
   goalId?: string | null
   priority?: string
   dueDate?: string | null
   startDueDate?: string | null
-  completionCriteria?: string
+  idealState?: string
+  currentState?: string
+  gap?: string
   approach?: string
+  completionCriteria?: string
   recurrence?: string | null
 }
 
@@ -131,8 +165,11 @@ function applyTaskFields(row: Record<string, unknown>, a: TaskFields) {
   if (a.priority !== undefined) row.priority = a.priority
   if (a.dueDate !== undefined) row.due_date = a.dueDate
   if (a.startDueDate !== undefined) row.start_due_date = a.startDueDate
-  if (a.completionCriteria !== undefined) row.completion_criteria = a.completionCriteria
+  if (a.idealState !== undefined) row.ideal_state = a.idealState
+  if (a.currentState !== undefined) row.current_state = a.currentState
+  if (a.gap !== undefined) row.gap = a.gap
   if (a.approach !== undefined) row.approach = a.approach
+  if (a.completionCriteria !== undefined) row.completion_criteria = a.completionCriteria
   if (a.recurrence !== undefined) row.recurrence = a.recurrence
 }
 

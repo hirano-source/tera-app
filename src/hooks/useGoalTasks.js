@@ -49,5 +49,11 @@ export function useGoalTasks(goalId) {
     await supabase.from('tasks').update({ status: next }).eq('id', task.id)
   }
 
-  return { tasks, loading, addTask, toggleTask, reload: load }
+  // タスク削除（owner/adminのみRLSで許可）
+  const deleteTask = async (task) => {
+    setTasks((ts) => ts.filter((t) => t.id !== task.id))
+    await supabase.from('tasks').delete().eq('id', task.id)
+  }
+
+  return { tasks, loading, addTask, toggleTask, deleteTask, reload: load }
 }

@@ -52,11 +52,18 @@ export function useTodayTodo() {
     if (data) setTodos((ts) => [...ts, data])
   }
 
+  // タスク削除（owner/adminのみRLSで許可）
+  const deleteTask = async (task) => {
+    setTodos((ts) => ts.filter((t) => t.id !== task.id))
+    await supabase.from('tasks').delete().eq('id', task.id)
+  }
+
   return {
     todos,
     loading,
     toggleTask,
     addTask,
+    deleteTask,
     reload: load,
   }
 }

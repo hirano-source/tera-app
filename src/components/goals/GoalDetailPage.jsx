@@ -33,7 +33,7 @@ export default function GoalDetailPage() {
   const { current, currentId } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
   const { items, available, busy, upload, download, remove } = useDeliverables(goalId)
-  const { tasks, addTask, toggleTask, reload: reloadTasks } = useGoalTasks(goalId)
+  const { tasks, addTask, toggleTask, deleteTask, reload: reloadTasks } = useGoalTasks(goalId)
 
   const fileRef = useRef(null)
   const [q, setQ] = useState('')
@@ -42,8 +42,8 @@ export default function GoalDetailPage() {
   const [newTask, setNewTask] = useState('')
   const [openTaskId, setOpenTaskId] = useState(null)
 
-  // ゴール情報（現状/完了基準/期日/担当）の編集フォーム
-  const [info, setInfo] = useState({ current: '', criteria: '', due_date: '', owner_id: '' })
+  // ゴール情報（理想/現状/差/完了基準/期日/担当）の編集フォーム
+  const [info, setInfo] = useState({ ideal_state: '', current: '', gap: '', criteria: '', due_date: '', owner_id: '' })
   const [members, setMembers] = useState([])
   const [savingInfo, setSavingInfo] = useState(false)
   const [crumbs, setCrumbs] = useState([])
@@ -51,7 +51,9 @@ export default function GoalDetailPage() {
   useEffect(() => {
     if (!goal) return
     setInfo({
+      ideal_state: goal.ideal_state ?? '',
       current: goal.current ?? '',
+      gap: goal.gap ?? '',
       criteria: goal.criteria ?? '',
       due_date: goal.due_date ?? '',
       owner_id: goal.owner_id ?? '',
@@ -92,7 +94,9 @@ export default function GoalDetailPage() {
 
   const infoDirty =
     !!goal &&
-    ((info.current ?? '') !== (goal.current ?? '') ||
+    ((info.ideal_state ?? '') !== (goal.ideal_state ?? '') ||
+      (info.current ?? '') !== (goal.current ?? '') ||
+      (info.gap ?? '') !== (goal.gap ?? '') ||
       (info.criteria ?? '') !== (goal.criteria ?? '') ||
       (info.due_date ?? '') !== (goal.due_date ?? '') ||
       (info.owner_id ?? '') !== (goal.owner_id ?? ''))
@@ -101,7 +105,9 @@ export default function GoalDetailPage() {
     setSavingInfo(true)
     try {
       await saveGoal({
+        ideal_state: info.ideal_state || '',
         current: info.current || '',
+        gap: info.gap || '',
         criteria: info.criteria || '',
         due_date: info.due_date || null,
         owner_id: info.owner_id || null,
@@ -174,11 +180,25 @@ export default function GoalDetailPage() {
           {/* ゴール情報 */}
           <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
+              <InfoField label="理想の状態">
+                {canEdit ? (
+                  <textarea rows={2} value={info.ideal_state} onChange={(e) => setInfo((p) => ({ ...p, ideal_state: e.target.value }))} placeholder="達成したらどうなっているか" className={inputCls} />
+                ) : (
+                  <ReadVal v={goal.ideal_state} />
+                )}
+              </InfoField>
               <InfoField label="現状">
                 {canEdit ? (
                   <textarea rows={2} value={info.current} onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))} placeholder="今どういう状態か" className={inputCls} />
                 ) : (
                   <ReadVal v={goal.current} />
+                )}
+              </InfoField>
+              <InfoField label="その差">
+                {canEdit ? (
+                  <textarea rows={2} value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ・足りないもの" className={inputCls} />
+                ) : (
+                  <ReadVal v={goal.gap} />
                 )}
               </InfoField>
               <InfoField label="完了の基準">
@@ -251,6 +271,17 @@ export default function GoalDetailPage() {
                   <button onClick={() => setOpenTaskId(t.id)} title="詳細" className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
                     <ChevronRight className="h-4 w-4" />
                   </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`タスク「${t.title}」を削除しますか？`)) deleteTask(t)
+                      }}
+                      title="削除"
+                      className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Settings2, HelpCircle, Check, ChevronRight } from 'lucide-react'
+import { Plus, Settings2, HelpCircle, Check, ChevronRight, Trash2 } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -12,7 +12,7 @@ import TaskMeta from '../tasks/TaskMeta'
 export default function TodayTodoPage() {
   const { current } = useWorkspace()
   const canEditGoals = ['owner', 'admin'].includes(current?.role)
-  const { todos, toggleTask, addTask, reload: reloadTodos } = useTodayTodo()
+  const { todos, toggleTask, addTask, deleteTask, reload: reloadTodos } = useTodayTodo()
   const {
     tree,
     users,
@@ -90,6 +90,17 @@ export default function TodayTodoPage() {
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
+                {canEditGoals && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`タスク「${todo.title}」を削除しますか？`)) deleteTask(todo)
+                    }}
+                    title="削除"
+                    className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -97,7 +97,9 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
       recurrence: t.recurrence || null,
       start_due_date: t.start_due_date || null,
       due_date: t.due_date || null,
-      completion_criteria: t.completion_criteria || null,
+      ideal_state: t.ideal_state || null,
+      current_state: t.current_state || null,
+      gap: t.gap || null,
       approach: t.approach || null,
       assignee_id: assignees[0] ?? null, // 主担当＝先頭
       blocker_type: blocked ? t.blocker_type || null : null,
@@ -223,20 +225,39 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
               </Field>
             </div>
 
-            <Field label="完了の基準（何ができたら完了か）">
+            <Field label="理想の状態">
               <textarea
                 rows={2}
-                value={t.completion_criteria || ''}
-                onChange={(e) => set('completion_criteria', e.target.value)}
+                value={t.ideal_state || ''}
+                onChange={(e) => set('ideal_state', e.target.value)}
+                placeholder="終わったらどうなってるか"
                 className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
               />
             </Field>
-
-            <Field label="やり方 / 最初の一歩">
+            <Field label="現状">
+              <textarea
+                rows={2}
+                value={t.current_state || ''}
+                onChange={(e) => set('current_state', e.target.value)}
+                placeholder="今どうなってるか"
+                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+            </Field>
+            <Field label="その差">
+              <textarea
+                rows={2}
+                value={t.gap || ''}
+                onChange={(e) => set('gap', e.target.value)}
+                placeholder="理想と現状のギャップ・詰まり・足りないもの"
+                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+            </Field>
+            <Field label="やること">
               <textarea
                 rows={2}
                 value={t.approach || ''}
                 onChange={(e) => set('approach', e.target.value)}
+                placeholder="差を埋める具体的な一手"
                 className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
               />
             </Field>
