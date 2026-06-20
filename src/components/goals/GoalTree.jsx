@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ChevronDown, ChevronRight, Play, Check, Pause,
+  ChevronDown, ChevronRight, Play, Check, Pause, Circle,
   ListPlus, GitBranchPlus, Maximize2, Users, X, MessageSquare, Trash2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
@@ -90,13 +90,13 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             className="flex min-w-0 flex-1 items-center gap-3 text-left"
           >
             <ProgressBadge value={goalPct} />
-            <span className="truncate text-sm font-medium text-zinc-800">{node.title}</span>
+            <span className="truncate text-sm font-semibold text-zinc-900">{node.title}</span>
             {owner && <Avatar user={owner} />}
           </button>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            {/* 状態アイコン：タップで 未着手→進行中→完了 を巡回 */}
-            <StatusCircle
+            {/* 状態ラベル：タップで 未着手→進行中→完了 を巡回 */}
+            <StatusPill
               status={node.status}
               onClick={() => onToggleTask(node)}
             />
@@ -201,30 +201,42 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
         )}
       </div>
 
-      {/* 子（接続線つき） */}
+      {/* 子（ツリーの枝分かれ線 ├─ └─ で親子を明示） */}
       {open && (hasChildren || addMode) && (
-        <div className="ml-[10px] border-l border-zinc-200 pl-3">
-          {children.map((child) => (
-            <Node
-              key={child.id}
-              node={child}
-              users={users}
-              depth={depth + 1}
-              onToggleTask={onToggleTask}
-              onAddTask={onAddTask}
-              onAddGoal={onAddGoal}
-              onAssignOwner={onAssignOwner}
-              onOpenTask={onOpenTask}
-              onDeleteGoal={onDeleteGoal}
-              canEditGoals={canEditGoals}
-            />
-          ))}
+        <div className="ml-3">
+          {children.map((child, i) => {
+            const isLastRow = i === children.length - 1 && !addMode
+            return (
+              <div
+                key={child.id}
+                className={cn(
+                  'relative pl-4',
+                  "before:absolute before:left-0 before:top-0 before:w-px before:bg-zinc-300 before:content-['']",
+                  isLastRow ? 'before:h-5' : 'before:h-full',
+                  "after:absolute after:left-0 after:top-5 after:h-px after:w-4 after:bg-zinc-300 after:content-['']",
+                )}
+              >
+                <Node
+                  node={child}
+                  users={users}
+                  depth={depth + 1}
+                  onToggleTask={onToggleTask}
+                  onAddTask={onAddTask}
+                  onAddGoal={onAddGoal}
+                  onAssignOwner={onAssignOwner}
+                  onOpenTask={onOpenTask}
+                  onDeleteGoal={onDeleteGoal}
+                  canEditGoals={canEditGoals}
+                />
+              </div>
+            )
+          })}
           {addMode && (
-            <div className="flex items-center gap-3 py-1.5">
+            <div className="relative flex items-center gap-3 py-1.5 pl-4 before:absolute before:left-0 before:top-0 before:h-5 before:w-px before:bg-zinc-300 before:content-[''] after:absolute after:left-0 after:top-5 after:h-px after:w-4 after:bg-zinc-300 after:content-['']">
               <span className="h-5 w-5" />
               {addMode === 'goal' ? (
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-brand/40 text-[11px] font-bold text-brand">
-                  0
+                <span className="flex h-7 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-brand/40 px-1.5 text-[10px] font-bold text-brand">
+                  0%
                 </span>
               ) : (
                 <span className="h-7 w-7 shrink-0 rounded-full border-2 border-dashed border-zinc-300" />
@@ -292,23 +304,28 @@ function ToolButton({ title, onClick, children }) {
   )
 }
 
-// タスクの状態アイコン（タップで巡回）。未着手=空丸 / 進行中=▶ / 完了=✓ / 待ち=‖
+// タスクの状態ラベル（タップで巡回）。アイコン＋文字＋色で一目で分かるように。
+// 進行中は青＝ゴール（紫）と色を分け、「作業中」がはっきり区別できる。
 const STATUS_VISUAL = {
-  todo: { label: '未着手', cls: 'border-2 border-zinc-300 bg-white', icon: null },
-  doing: { label: '進行中', cls: 'bg-brand text-white', icon: <Play className="h-3 w-3 translate-x-0.5 fill-white" /> },
-  done: { label: '完了', cls: 'bg-emerald-500 text-white', icon: <Check className="h-3.5 w-3.5" strokeWidth={3} /> },
-  blocked: { label: '待ち', cls: 'bg-amber-400 text-white', icon: <Pause className="h-3 w-3 fill-white" /> },
+  todo: { label: '未着手', cls: 'border border-zinc-300 bg-white text-zinc-500', icon: <Circle className="h-3 w-3" /> },
+  doing: { label: '進行中', cls: 'bg-blue-100 text-blue-700', icon: <Play className="h-3 w-3 fill-blue-700" /> },
+  done: { label: '完了', cls: 'bg-emerald-100 text-emerald-700', icon: <Check className="h-3 w-3" strokeWidth={3} /> },
+  blocked: { label: '待ち', cls: 'bg-amber-100 text-amber-700', icon: <Pause className="h-3 w-3 fill-amber-700" /> },
 }
 
-function StatusCircle({ status, onClick }) {
+function StatusPill({ status, onClick }) {
   const v = STATUS_VISUAL[status] ?? STATUS_VISUAL.todo
   return (
     <button
       onClick={onClick}
-      title={`${v.label}（タップで切替）`}
-      className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors', v.cls)}
+      title="タップで状態を切替（未着手→進行中→完了）"
+      className={cn(
+        'flex w-[68px] shrink-0 items-center justify-center gap-1 rounded-full py-1 text-[11px] font-medium transition-colors',
+        v.cls,
+      )}
     >
       {v.icon}
+      <span>{v.label}</span>
     </button>
   )
 }
@@ -329,10 +346,11 @@ function countOwnTasks(node) {
   return { done, total }
 }
 
+// ゴールの目印＝四角バッジ（％）。タスクの丸（StatusCircle）と形で区別する。
 function ProgressBadge({ value }) {
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">
-      {value}
+    <span className="flex h-7 shrink-0 items-center justify-center rounded-md bg-brand px-1.5 text-[10px] font-bold text-white">
+      {value}%
     </span>
   )
 }

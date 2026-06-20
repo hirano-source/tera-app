@@ -68,8 +68,8 @@ export default function TodayTodoPage() {
                   onClick={() => toggleTask(todo)}
                   className={
                     todo.status === 'done'
-                      ? 'flex h-5 w-5 items-center justify-center rounded-md bg-brand text-white'
-                      : 'h-5 w-5 rounded-md border-2 border-zinc-300 hover:border-brand'
+                      ? 'flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500 text-white'
+                      : 'h-5 w-5 rounded-md border-2 border-zinc-300 hover:border-emerald-400'
                   }
                 >
                   {todo.status === 'done' && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
