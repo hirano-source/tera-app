@@ -270,7 +270,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
             <div>
               <span className="mb-1 block text-xs font-medium text-zinc-500">コメント / 議事録</span>
               <div className="h-72 overflow-hidden rounded-lg border border-zinc-200">
-                <CommentThread targetType="task" targetId={t.id} className="h-full" />
+                <CommentThread targetType="task" targetId={t.id} members={members} className="h-full" />
               </div>
             </div>
           </div>

@@ -29,7 +29,8 @@ export function useComments(targetType, targetId) {
     load()
   }, [load])
 
-  const addComment = async (body) => {
+  // mentions = 指名されたユーザーIDの配列。投稿後、本人以外へ通知を作る。
+  const addComment = async (body, mentions = []) => {
     const text = body.trim()
     if (!text || !targetId || !currentId) return
     const { data } = await supabase
@@ -44,6 +45,23 @@ export function useComments(targetType, targetId) {
       .select()
       .single()
     if (data) setComments((c) => [...c, data])
+
+    const targets = [...new Set(mentions)].filter((id) => id && id !== user?.id)
+    if (targets.length) {
+      await supabase.from('notifications').insert(
+        targets.map((uid) => ({
+          workspace_id: currentId,
+          user_id: uid,
+          type: 'mention',
+          payload: {
+            by: user?.name ?? null,
+            target_type: targetType,
+            target_id: targetId,
+            excerpt: text.slice(0, 80),
+          },
+        })),
+      )
+    }
   }
 
   // 解決済み⇔未解決のトグル（楽観的更新）

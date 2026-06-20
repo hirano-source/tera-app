@@ -130,6 +130,11 @@ function describe(n) {
         title: '新しいタスクが割り当てられました',
         body: [p.title ? `「${p.title}」` : '', p.by ? `（${p.by} さんから）` : ''].join(' ').trim(),
       }
+    case 'mention':
+      return {
+        title: 'コメントで指名されました',
+        body: [p.excerpt ? `「${p.excerpt}」` : '', p.by ? `（${p.by} さんから）` : ''].join(' ').trim(),
+      }
     default:
       return { title: n.type, body: typeof p?.title === 'string' ? p.title : '' }
   }

@@ -345,7 +345,7 @@ export default function GoalDetailPage() {
           <MessageSquare className="h-5 w-5 text-zinc-500" />
           チャット
         </div>
-        <CommentThread targetType="goal" targetId={goalId} className="flex-1" />
+        <CommentThread targetType="goal" targetId={goalId} members={members} className="flex-1" />
       </aside>
 
       <TaskDetailModal
