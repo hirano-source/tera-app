@@ -48,7 +48,7 @@ export default function GoalDetailPage() {
   const [linkName, setLinkName] = useState('')
 
   // ゴール情報（理想/現状/差/完了基準/期日/担当）の編集フォーム
-  const [info, setInfo] = useState({ ideal_state: '', current: '', gap: '', criteria: '', due_date: '', owner_id: '' })
+  const [info, setInfo] = useState({ title: '', ideal_state: '', current: '', gap: '', criteria: '', due_date: '', owner_id: '' })
   const [members, setMembers] = useState([])
   const [savingInfo, setSavingInfo] = useState(false)
   const [crumbs, setCrumbs] = useState([])
@@ -56,6 +56,7 @@ export default function GoalDetailPage() {
   useEffect(() => {
     if (!goal) return
     setInfo({
+      title: goal.title ?? '',
       ideal_state: goal.ideal_state ?? '',
       current: goal.current ?? '',
       gap: goal.gap ?? '',
@@ -99,7 +100,8 @@ export default function GoalDetailPage() {
 
   const infoDirty =
     !!goal &&
-    ((info.ideal_state ?? '') !== (goal.ideal_state ?? '') ||
+    ((info.title ?? '') !== (goal.title ?? '') ||
+      (info.ideal_state ?? '') !== (goal.ideal_state ?? '') ||
       (info.current ?? '') !== (goal.current ?? '') ||
       (info.gap ?? '') !== (goal.gap ?? '') ||
       (info.criteria ?? '') !== (goal.criteria ?? '') ||
@@ -110,6 +112,7 @@ export default function GoalDetailPage() {
     setSavingInfo(true)
     try {
       await saveGoal({
+        title: info.title.trim() || goal.title,
         ideal_state: info.ideal_state || '',
         current: info.current || '',
         gap: info.gap || '',
@@ -207,6 +210,17 @@ export default function GoalDetailPage() {
 
           {/* ゴール情報 */}
           <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
+            <InfoField label="ゴール名">
+              {canEdit ? (
+                <input
+                  value={info.title}
+                  onChange={(e) => setInfo((p) => ({ ...p, title: e.target.value }))}
+                  className={inputCls}
+                />
+              ) : (
+                <ReadVal v={goal.title} />
+              )}
+            </InfoField>
             <div className="grid gap-4 sm:grid-cols-2">
               <InfoField label="理想の状態">
                 {canEdit ? (

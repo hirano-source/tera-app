@@ -73,6 +73,12 @@ export default function BusinessSettingsModal({ open, onClose }) {
     }
   }
 
+  const saveVisionTitle = async () => {
+    const t = (vision?.title || '').trim()
+    if (!t || !vision) return
+    await supabase.from('goals').update({ title: t }).eq('id', vision.id)
+  }
+
   const achieveVision = async () => {
     if (!vision) return
     if (!confirm(`大目標「${vision.title}」を達成済みにして、新しい大目標を設定できるようにします。よろしいですか？`)) return
@@ -144,7 +150,17 @@ export default function BusinessSettingsModal({ open, onClose }) {
             </label>
             {vision ? (
               <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
-                <p className="font-medium text-zinc-800">{vision.title}</p>
+                {canEdit ? (
+                  <input
+                    value={vision.title}
+                    onChange={(e) => setVision((v) => ({ ...v, title: e.target.value }))}
+                    onBlur={saveVisionTitle}
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                    className="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-800 outline-none focus:border-zinc-500"
+                  />
+                ) : (
+                  <p className="font-medium text-zinc-800">{vision.title}</p>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     onClick={() => {
