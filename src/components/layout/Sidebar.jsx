@@ -6,14 +6,18 @@ import teraSymbol from '../../assets/TERA_Symbol_Nega.png'
 
 // 左サイドバー（ダーク）。ロゴ・ナビアイコン・ユーザーアバターを縦に並べる。
 // データは props で受け取り、描画に徹する。
-export default function Sidebar({ user, badges }) {
+export default function Sidebar({ user, badges, onOpenBusiness }) {
   const { signOut } = useAuth()
   return (
     <nav className="hidden h-full w-[88px] shrink-0 flex-col items-center bg-sidebar py-3 text-white md:flex">
-      {/* ロゴ */}
-      <div className="mb-5 mt-1 flex h-12 w-full items-center justify-center">
+      {/* ロゴ（タップで事業設定：大目標・事業名・削除） */}
+      <button
+        onClick={onOpenBusiness}
+        title="事業設定（大目標・事業名・削除）"
+        className="mb-5 mt-1 flex h-12 w-full items-center justify-center rounded-xl hover:bg-white/10"
+      >
         <img src={teraSymbol} alt="TERA" className="w-12 object-contain" />
-      </div>
+      </button>
 
       {/* ナビ */}
       <div className="flex flex-1 flex-col items-center gap-1">

@@ -17,11 +17,16 @@ export function WorkspaceProvider({ children }) {
     if (!user?.id) return
     const { data: mems } = await supabase
       .from('memberships')
-      .select('role, workspaces(id,name)')
+      .select('role, workspaces(id,name,vision_goal_id)')
       .eq('user_id', user.id)
     const list = (mems ?? [])
       .filter((m) => m.workspaces)
-      .map((m) => ({ id: m.workspaces.id, name: m.workspaces.name, role: m.role }))
+      .map((m) => ({
+        id: m.workspaces.id,
+        name: m.workspaces.name,
+        visionGoalId: m.workspaces.vision_goal_id,
+        role: m.role,
+      }))
     setWorkspaces(list)
     setCurrentId((prev) =>
       prev && list.some((w) => w.id === prev) ? prev : (list[0]?.id ?? null),
@@ -62,6 +67,20 @@ export function WorkspaceProvider({ children }) {
     await reload()
   }
 
+  // 事業名の変更（owner/adminのみ・RPC）
+  const renameBusiness = async (id, name) => {
+    const { error } = await supabase.rpc('rename_business', { p_workspace_id: id, p_name: name.trim() })
+    if (error) throw error
+    await reload()
+  }
+
+  // 事業の大目標（vision）を設定/解除（owner/adminのみ・RPC）
+  const setVisionGoal = async (id, goalId) => {
+    const { error } = await supabase.rpc('set_vision_goal', { p_workspace_id: id, p_goal_id: goalId })
+    if (error) throw error
+    await reload()
+  }
+
   const current = workspaces.find((w) => w.id === currentId) ?? null
   const display = profile ?? { name: user?.email ?? '', avatar_color: '#6d5dfc' }
 
@@ -72,6 +91,8 @@ export function WorkspaceProvider({ children }) {
     setCurrent,
     createBusiness,
     deleteBusiness,
+    renameBusiness,
+    setVisionGoal,
     reload,
     user: {
       id: profile?.id,

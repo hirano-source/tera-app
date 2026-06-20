@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { ChevronDown, Check, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Check, Plus, Trash2, Settings } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import SearchBox from './SearchBox'
 
 // 上部バー（ダーク）。左に事業（ワークスペース）切替、中央に検索、右にポイント。
-export default function TopBar() {
+export default function TopBar({ onOpenBusiness }) {
   const { workspaces, current, setCurrent, createBusiness, deleteBusiness } = useWorkspace()
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -84,6 +84,19 @@ export default function TopBar() {
                 )}
               </div>
             ))}
+
+            <div className="my-1 border-t border-zinc-100" />
+
+            <button
+              onClick={() => {
+                setOpen(false)
+                onOpenBusiness?.()
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-600 hover:bg-zinc-50"
+            >
+              <Settings className="h-4 w-4" />
+              事業設定（大目標・名前・削除）
+            </button>
 
             <div className="my-1 border-t border-zinc-100" />
 
