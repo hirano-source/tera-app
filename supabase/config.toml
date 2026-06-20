@@ -8,3 +8,8 @@ project_id = "rjxfleeyntqusuoqzclw"
 # プラットフォームのJWTゲートに弾かせないため。認可は関数内のOAuthで自前に行う。
 [functions.mcp]
 verify_jwt = false
+
+# 文字起こし（Whisper等STT）プロキシ。verify_jwt=false にして CORS プリフライト(OPTIONS)を
+# 関数で処理しつつ、本体では Bearer のユーザーJWTを getUser で自前検証する。
+[functions.transcribe]
+verify_jwt = false
