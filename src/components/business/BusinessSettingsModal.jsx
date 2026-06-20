@@ -7,7 +7,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 // 事業設定（左上ロゴ／事業ドロップダウンから開く）。
 // 事業の大目標（北極星）・事業名の変更・事業の削除を1か所に集約。
 export default function BusinessSettingsModal({ open, onClose }) {
-  const { current, currentId, workspaces, renameBusiness, setVisionGoal, deleteBusiness, uploadLogo, removeLogo, user } =
+  const { current, currentId, workspaces, renameBusiness, setVisionGoal, setAssistantContext, deleteBusiness, uploadLogo, removeLogo, user } =
     useWorkspace()
   const navigate = useNavigate()
   const canEdit = ['owner', 'admin'].includes(current?.role)
@@ -15,6 +15,7 @@ export default function BusinessSettingsModal({ open, onClose }) {
   const [name, setName] = useState('')
   const [vision, setVision] = useState(null) // {id,title} | null
   const [newVision, setNewVision] = useState('')
+  const [ctxText, setCtxText] = useState('')
   const [busy, setBusy] = useState(false)
   const logoRef = useRef(null)
 
@@ -35,6 +36,7 @@ export default function BusinessSettingsModal({ open, onClose }) {
   useEffect(() => {
     if (!open || !current) return
     setName(current.name ?? '')
+    setCtxText(current.assistantContext ?? '')
     let active = true
     if (current.visionGoalId) {
       supabase
@@ -105,6 +107,17 @@ export default function BusinessSettingsModal({ open, onClose }) {
       setVision(null)
     } catch (e) {
       alert('失敗しました: ' + (e?.message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveContext = async () => {
+    setBusy(true)
+    try {
+      await setAssistantContext(currentId, ctxText.trim())
+    } catch (e) {
+      alert('保存に失敗しました: ' + (e?.message ?? e))
     } finally {
       setBusy(false)
     }
@@ -256,6 +269,40 @@ export default function BusinessSettingsModal({ open, onClose }) {
             )}
             <p className="mt-1.5 text-xs text-zinc-400">
               この事業の一番大きな目標。ふだんのゴールはこの下に積み上げます。「開く」で理想／現状／差まで書けます。
+            </p>
+          </section>
+
+          {/* この事業の文脈（魂）＝Claude連携時に渡る */}
+          <section>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">
+              この事業の文脈（Claudeに渡す）
+            </label>
+            {canEdit ? (
+              <>
+                <textarea
+                  value={ctxText}
+                  onChange={(e) => setCtxText(e.target.value)}
+                  rows={5}
+                  placeholder="この事業で大切にしている考え方・本質・お客さん像・方針など。Claudeが連携時に読み、これに沿って導きます。"
+                  className="w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={saveContext}
+                    disabled={busy || ctxText === (current.assistantContext ?? '')}
+                    className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+                  >
+                    保存
+                  </button>
+                </div>
+              </>
+            ) : ctxText ? (
+              <p className="whitespace-pre-wrap text-sm text-zinc-600">{ctxText}</p>
+            ) : (
+              <p className="text-sm text-zinc-400">未設定</p>
+            )}
+            <p className="mt-1.5 text-xs text-zinc-400">
+              スマホ／PCのClaudeにTERAを繋ぐと、ここに書いた文脈を理解した状態で「次に何をすべきか」を提案します。
             </p>
           </section>
 

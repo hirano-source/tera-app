@@ -14,7 +14,10 @@ export type Ctx = {
   userId: string
   workspaceId: string | null
   workspaceName: string | null
-  visionGoalId: string | null // 事業の大目標(北極星)＝ゴール階層の頂点
+  role: string | null // 現在WSでの自分の役割 owner/admin/member
+  visionGoalId: string | null // 事業の大目標＝ゴール階層の頂点
+  assistantContext: string | null // このWSの「魂／文脈」テキスト
+  workspaces: { id: string; name: string; role: string }[] // 所属する全WS
 }
 
 // リフレッシュで得た生セッション（DBにキャッシュする素材）。
@@ -57,31 +60,141 @@ export async function contextFromAccessToken(accessToken: string): Promise<Ctx> 
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   })
-  const { data: mem } = await db
-    .from('memberships').select('workspace_id, workspaces(name, vision_goal_id)').limit(1).maybeSingle()
-  const ws = mem?.workspaces as { name?: string; vision_goal_id?: string | null } | null
+  return resolveContext(db, subFromJwt(accessToken))
+}
+
+// 所属する全WSを読み、アクティブWS（users.active_workspace_id＝UIタブと共有）を現在WSに解決する。
+// preferredId 指定時はそれを優先（set_active_workspace 直後の再解決用）。所属外/未設定なら先頭。
+type WsRow = { id: string; name: string; vision_goal_id: string | null; assistant_context: string | null }
+async function resolveContext(
+  db: SupabaseClient,
+  userId: string,
+  preferredId?: string | null,
+): Promise<Ctx> {
+  const { data: mems } = await db
+    .from('memberships')
+    .select('role, workspaces(id, name, vision_goal_id, assistant_context)')
+  const list = (mems ?? []).filter((m) => m.workspaces) as { role: string; workspaces: WsRow }[]
+  const workspaces = list.map((m) => ({ id: m.workspaces.id, name: m.workspaces.name, role: m.role }))
+
+  let activeId = preferredId ?? null
+  if (!activeId) {
+    const { data: me } = await db
+      .from('users').select('active_workspace_id').eq('id', userId).maybeSingle()
+    activeId = me?.active_workspace_id ?? null
+  }
+  const chosen = list.find((m) => m.workspaces.id === activeId) ?? list[0] ?? null
+  const ws = chosen?.workspaces ?? null
   return {
     db,
-    userId: subFromJwt(accessToken),
-    workspaceId: mem?.workspace_id ?? null,
+    userId,
+    workspaceId: ws?.id ?? null,
     workspaceName: ws?.name ?? null,
+    role: chosen?.role ?? null,
     visionGoalId: ws?.vision_goal_id ?? null,
+    assistantContext: ws?.assistant_context ?? null,
+    workspaces,
   }
 }
 
+// 操作対象WSを切り替える（DBに永続化＝UIタブとも共有）。切替後の文脈を返す。
+export async function setActiveWorkspace(ctx: Ctx, workspaceId: string): Promise<Ctx> {
+  const { error } = await ctx.db.rpc('set_active_workspace', { p_workspace_id: workspaceId })
+  if (error) throw new Error(error.message)
+  return resolveContext(ctx.db, ctx.userId, workspaceId)
+}
+
 // ── 読み取り ────────────────────────────────────────────
+// 「おはよう、仕事しよう」の起点。現在地・全WS・現在の状態・取扱説明(manual)をまとめて返す。
 export async function getContext(ctx: Ctx) {
   const { data: user } = await ctx.db
     .from('users').select('name,email').eq('id', ctx.userId).maybeSingle()
-  // 事業の大目標(北極星)＝ゴール階層の頂点。新しいゴールは原則この下に積む。
   let visionGoal: { id: string; title: string } | null = null
   if (ctx.visionGoalId) {
     const { data: v } = await ctx.db
       .from('goals').select('id,title').eq('id', ctx.visionGoalId).maybeSingle()
     visionGoal = v ?? null
   }
-  return { workspace: ctx.workspaceName, user: user?.name, email: user?.email, visionGoal }
+  const manual = await buildManual(ctx, visionGoal)
+  return {
+    user: user?.name,
+    email: user?.email,
+    currentWorkspace: ctx.workspaceId
+      ? { id: ctx.workspaceId, name: ctx.workspaceName, role: ctx.role }
+      : null,
+    workspaces: ctx.workspaces,
+    visionGoal,
+    manual,
+  }
 }
+
+const roleJp = (r: string | null) =>
+  r === 'owner' ? 'オーナー' : r === 'admin' ? '管理者' : r === 'member' ? 'メンバー' : '不明'
+
+// 現在のWSに即した「取扱説明＋現在地＋今日の状態＋このWSの文脈」を組み立てる。
+// 操作の常時ルール（コーチング姿勢・安全）は mcp.ts の instructions 側に常駐。ここはそれを現在地で具体化する。
+async function buildManual(ctx: Ctx, visionGoal: { id: string; title: string } | null): Promise<string> {
+  const [today, all, activity] = await Promise.all([
+    listTasks(ctx, { todayOnly: true }),
+    listTasks(ctx),
+    getActivityLog(ctx, { limit: 8 }),
+  ])
+  const blocked = all.filter((t) => t.status === 'blocked')
+  const L: string[] = []
+
+  L.push('【現在地】')
+  L.push(`いま操作中の事業（ワークスペース）: ${ctx.workspaceName ?? '(未選択)'}（あなたの役割: ${roleJp(ctx.role)}）`)
+  const others = ctx.workspaces.filter((w) => w.id !== ctx.workspaceId)
+  if (others.length) {
+    L.push(`他の事業: ${others.map((w) => `${w.name}(${w.id})`).join(' / ')}`)
+    L.push('別の事業を操作するときは set_active_workspace で切り替えてから。WSを跨いで勝手に書かないこと。どの事業の話か曖昧なら必ず確認する。')
+  }
+
+  if (visionGoal) {
+    L.push('')
+    L.push(`【この事業の大目標（絶対目標・ゴール階層の頂点）】${visionGoal.title}（id: ${visionGoal.id}）`)
+    L.push('すべての提案はこの大目標から逆算する。大目標の下に置きたいゴールは create_goal の parentId にこの id を渡す。')
+  }
+
+  if (ctx.assistantContext) {
+    L.push('')
+    L.push('【この事業の文脈・大切にしていること（この事業の魂）】')
+    L.push(ctx.assistantContext)
+  }
+
+  L.push('')
+  L.push('【今日の状態】')
+  L.push(
+    today.length
+      ? `今日のToDo（${today.length}件）: ${today.map((t) => t.title).join(' / ')}`
+      : '今日のToDoは未設定。最重要の一手を一緒に決めて create_task({isToday:true}) で置く。',
+  )
+  if (blocked.length) {
+    L.push(`詰まっているタスク（${blocked.length}件）: ${blocked.map((t) => t.title).join(' / ')} — 次の一手を提案して解除を促す。`)
+  }
+  if (activity.length) {
+    L.push(`直近の動き: ${activity.map((a) => a.summary).slice(0, 5).join(' / ')}`)
+  }
+
+  L.push('')
+  L.push(MANUAL_STATIC)
+  return L.join('\n')
+}
+
+// WS非依存の取扱説明（構造とルールの要点）。常時ルールの“控え”＝クライアントが instructions を無視しても効くように同梱。
+const MANUAL_STATIC = `【TERAの構造】事業 → 大目標（頂点）→ ゴール → タスク → サブタスク（2段まで）。
+ゴールもタスクも「理想の状態 → 現状 → その差(gap) → やること(approach)」の型で考える。
+タスクの主なフィールド: completionCriteria(完了の基準) / approach(やること) / priority(P0今日中/P1今週/P2来週/P3〆切あり/P4いつか) / startDueDate(着手期限) / dueDate(完了期限) / recurrence(daily/weekly/monthly。突発・重点案件は省略) / assigneeId(担当) / goalId(紐づくゴール)。
+詰まったら status=blocked にし blockerType(data/approval/reply/external)/blockerOwner(誰待ち)/blockerNote を入れる。
+
+【あなたの動き方（記録係で終わらない）】
+1. 開始の合図や会話開始で get_context を呼び、今日やるべきことを1〜3個に絞って提示し、最初の一手を促す。
+2. 放置・blocked のタスクを拾い、具体的な次の一手を出す。
+3. 大目標から逆算して、足りないゴール／タスクを提案する。
+4. タイトルだけのタスクは completionCriteria / approach / priority まで一緒に埋める。完了基準が曖昧なものは言語化させる。
+5. 会議・相談・決定は add_comment でそのゴール／タスクに残す（「Claudeより」）。作業前に list_comments で経緯を読む。
+
+【安全】delete など破壊的操作は実行前に必ず本人へ確認。完了にするだけなら update_task の status=done。現在WSの外には書かない。`
 
 export async function listGoals(ctx: Ctx) {
   const { data } = await ctx.db
@@ -120,10 +233,10 @@ export async function getActivityLog(ctx: Ctx, { limit = 15 } = {}) {
 
 // ── 書き込み ────────────────────────────────────────────
 export async function createGoal(ctx: Ctx, { title, parentId = null }: { title: string; parentId?: string | null }) {
-  // 親未指定なら大目標(北極星)の下にぶら下げる＝頂点構造を維持（設計A）。
-  const parent = parentId ?? ctx.visionGoalId ?? null
+  // parentId 未指定はトップレベル（parent_id=null）。大目標への自動ぶら下げはしない＝誤爆防止。
+  // 大目標の下に置きたい時は呼び出し側が parentId に大目標id（manual/get_context で確認）を渡す。
   const { data, error } = await ctx.db.from('goals')
-    .insert({ workspace_id: ctx.workspaceId, owner_id: ctx.userId, parent_id: parent, title, progress: 0 })
+    .insert({ workspace_id: ctx.workspaceId, owner_id: ctx.userId, parent_id: parentId, title, progress: 0 })
     .select().single()
   if (error) throw new Error(error.message)
   return data

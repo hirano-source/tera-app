@@ -17,7 +17,7 @@ export function WorkspaceProvider({ children }) {
     if (!user?.id) return
     const { data: mems } = await supabase
       .from('memberships')
-      .select('role, workspaces(id,name,vision_goal_id,logo_url)')
+      .select('role, workspaces(id,name,vision_goal_id,logo_url,assistant_context)')
       .eq('user_id', user.id)
     const list = (mems ?? [])
       .filter((m) => m.workspaces)
@@ -26,18 +26,27 @@ export function WorkspaceProvider({ children }) {
         name: m.workspaces.name,
         visionGoalId: m.workspaces.vision_goal_id,
         logoUrl: m.workspaces.logo_url,
+        assistantContext: m.workspaces.assistant_context,
         role: m.role,
       }))
     setWorkspaces(list)
-    setCurrentId((prev) =>
-      prev && list.some((w) => w.id === prev) ? prev : (list[0]?.id ?? null),
-    )
     const { data: me } = await supabase
       .from('users')
-      .select('id,name,avatar_color')
+      .select('id,name,avatar_color,active_workspace_id')
       .eq('id', user.id)
       .maybeSingle()
     setProfile(me)
+    // 現在WSの優先順位：今表示中(prev) → DBのアクティブWS（MCPと共有）→ localStorage → 先頭
+    const inList = (id) => id && list.some((w) => w.id === id)
+    setCurrentId((prev) =>
+      inList(prev)
+        ? prev
+        : inList(me?.active_workspace_id)
+          ? me.active_workspace_id
+          : inList(localStorage.getItem('ws'))
+            ? localStorage.getItem('ws')
+            : list[0]?.id ?? null,
+    )
     setLoading(false)
   }, [user?.id])
 
@@ -48,6 +57,15 @@ export function WorkspaceProvider({ children }) {
   const setCurrent = (id) => {
     setCurrentId(id)
     localStorage.setItem('ws', id)
+    // サーバー側にもアクティブWSを記録＝MCP（Claude連携）が同じ現在WSを読む
+    supabase.rpc('set_active_workspace', { p_workspace_id: id }).then(() => {})
+  }
+
+  // このWSの「魂／文脈」（アシスタントに渡す自由テキスト）を保存（owner/admin・RPC）
+  const setAssistantContext = async (id, text) => {
+    const { error } = await supabase.rpc('set_assistant_context', { p_workspace_id: id, p_text: text })
+    if (error) throw error
+    await reload()
   }
 
   // 新しい事業（ワークスペース）を作り、その事業に切り替える。
@@ -111,6 +129,7 @@ export function WorkspaceProvider({ children }) {
     deleteBusiness,
     renameBusiness,
     setVisionGoal,
+    setAssistantContext,
     uploadLogo,
     removeLogo,
     reload,
