@@ -14,6 +14,8 @@ const INSTRUCTIONS = `TERA（目標達成型タスク管理）のMCP。コネク
 
 タスクは create_task / update_task、ゴールは create_goal で操作。権限の無い操作はサーバが拒否する。
 
+事業には「大目標（北極星）」があり、これがゴール階層の頂点になる（get_context の visionGoal で確認できる）。新しいゴールは create_goal で parentId を指定しなければ自動で大目標の下に積まれる。大目標から逆算してゴール→タスクへブレイクダウンする意識で。
+
 ゴールもタスクも「理想の状態 → 現状 → その差 →（手）」の型で考える。タスクを作る/更新するときは、ただのタイトルで終わらせず、可能なら次まで一緒に提案して埋めること（これがTERAの肝）：
 - idealState（理想の状態＝終わったらどうなってるか）/ currentState（現状）/ gap（その差＝詰まり・足りないもの）
 - approach（やること＝差を埋める具体的な一手）/ completionCriteria（完了の基準＝できた/できてないの判断）
@@ -174,7 +176,7 @@ const TOOLS: Record<string, Tool> = {
     run: (ctx, a) => supa.logActivity(ctx, a),
   },
   delete_task: {
-    description: 'タスクを削除する（owner/adminのみ。権限が無ければ何も起きない）。完了にするだけなら update_task の status=done を使う。',
+    description: 'タスクを削除する（owner/admin、または自分が担当のタスク。権限が無ければ何も起きない）。完了にするだけなら update_task の status=done を使う。',
     inputSchema: S.del,
     run: (ctx, a) => supa.deleteTask(ctx, a),
   },

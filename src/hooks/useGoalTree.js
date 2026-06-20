@@ -7,7 +7,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 // 「今やるべきゴール」をスキルツリー（階層）で扱う。
 // goals(parent_id) を入れ子にし、各ゴール配下に tasks(goal_id) を葉として付ける。
 export function useGoalTree() {
-  const { currentId, user } = useWorkspace()
+  const { currentId, current, user } = useWorkspace()
   const [tree, setTree] = useState([])
   const [users, setUsers] = useState({})
   const [loading, setLoading] = useState(true)
@@ -70,14 +70,15 @@ export function useGoalTree() {
     load()
   }, [load])
 
-  // ゴール作成（parentId 指定で配下に）
+  // ゴール作成（parentId 指定で配下に）。親未指定なら大目標(北極星)の下にぶら下げる＝頂点構造を維持（設計A）。
   const createGoal = async (title, parentId = null) => {
     const text = title.trim()
     if (!text || !currentId) return
+    const parent = parentId ?? current?.visionGoalId ?? null
     await supabase.from('goals').insert({
       workspace_id: currentId,
       owner_id: user?.id ?? null,
-      parent_id: parentId,
+      parent_id: parent,
       title: text,
       progress: 0,
     })

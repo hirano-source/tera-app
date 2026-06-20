@@ -35,9 +35,11 @@ const BLOCKER = [
 ]
 
 export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
-  const { current, currentId } = useWorkspace()
-  const canDelete = ['owner', 'admin'].includes(current?.role)
+  const { current, currentId, user } = useWorkspace()
+  const isAdmin = ['owner', 'admin'].includes(current?.role)
   const [t, setT] = useState(null)
+  // 削除はowner/admin、または自分が主担当のタスクなら可（RLSと一致）
+  const canDelete = isAdmin || (!!t?.assignee_id && t.assignee_id === user?.id)
   const [busy, setBusy] = useState(false)
   const [members, setMembers] = useState([])
   const [assignees, setAssignees] = useState([]) // 担当（複数）user_id配列

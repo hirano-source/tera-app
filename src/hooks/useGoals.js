@@ -5,7 +5,7 @@ import { useWorkspace } from './useWorkspace'
 // ゴールを Supabase から取得し、現在のワークスペースに絞る。
 // goals: 全ゴール / topGoals: 最上位（parent_id なし）＝「今やるべきゴール」。
 export function useGoals() {
-  const { currentId, user } = useWorkspace()
+  const { currentId, current, user } = useWorkspace()
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -27,16 +27,17 @@ export function useGoals() {
     }
   }, [currentId])
 
-  // ゴールを作成（parentId 指定で配下に。未指定なら最上位）
+  // ゴールを作成（parentId 指定で配下に）。親未指定なら大目標(北極星)の下にぶら下げる＝頂点構造を維持（設計A）。
   const createGoal = async (title, parentId = null) => {
     const text = title.trim()
     if (!text || !currentId) return null
+    const parent = parentId ?? current?.visionGoalId ?? null
     const { data } = await supabase
       .from('goals')
       .insert({
         workspace_id: currentId,
         owner_id: user?.id ?? null,
-        parent_id: parentId,
+        parent_id: parent,
         title: text,
         progress: 0,
       })

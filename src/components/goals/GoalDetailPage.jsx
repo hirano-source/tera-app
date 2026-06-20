@@ -32,7 +32,7 @@ export default function GoalDetailPage() {
   const { goalId } = useParams()
   const navigate = useNavigate()
   const { goal, loading, saveGoal, deleteGoal } = useGoal(goalId)
-  const { current, currentId } = useWorkspace()
+  const { current, currentId, user } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
   const { items, available, busy, upload, addLink, open: openItem, remove } = useDeliverables(goalId)
   const { tasks, addTask, toggleTask, deleteTask, reload: reloadTasks } = useGoalTasks(goalId)
@@ -313,7 +313,7 @@ export default function GoalDetailPage() {
                   <button onClick={() => setOpenTaskId(t.id)} title="詳細" className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                  {canEdit && (
+                  {(canEdit || t.assignee_id === user?.id) && (
                     <button
                       onClick={() => {
                         if (confirm(`タスク「${t.title}」を削除しますか？`)) deleteTask(t)

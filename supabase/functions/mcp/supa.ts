@@ -14,6 +14,7 @@ export type Ctx = {
   userId: string
   workspaceId: string | null
   workspaceName: string | null
+  visionGoalId: string | null // 事業の大目標(北極星)＝ゴール階層の頂点
 }
 
 // リフレッシュで得た生セッション（DBにキャッシュする素材）。
@@ -57,12 +58,14 @@ export async function contextFromAccessToken(accessToken: string): Promise<Ctx> 
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   })
   const { data: mem } = await db
-    .from('memberships').select('workspace_id, workspaces(name)').limit(1).maybeSingle()
+    .from('memberships').select('workspace_id, workspaces(name, vision_goal_id)').limit(1).maybeSingle()
+  const ws = mem?.workspaces as { name?: string; vision_goal_id?: string | null } | null
   return {
     db,
     userId: subFromJwt(accessToken),
     workspaceId: mem?.workspace_id ?? null,
-    workspaceName: (mem?.workspaces as { name?: string } | null)?.name ?? null,
+    workspaceName: ws?.name ?? null,
+    visionGoalId: ws?.vision_goal_id ?? null,
   }
 }
 
@@ -70,7 +73,14 @@ export async function contextFromAccessToken(accessToken: string): Promise<Ctx> 
 export async function getContext(ctx: Ctx) {
   const { data: user } = await ctx.db
     .from('users').select('name,email').eq('id', ctx.userId).maybeSingle()
-  return { workspace: ctx.workspaceName, user: user?.name, email: user?.email }
+  // 事業の大目標(北極星)＝ゴール階層の頂点。新しいゴールは原則この下に積む。
+  let visionGoal: { id: string; title: string } | null = null
+  if (ctx.visionGoalId) {
+    const { data: v } = await ctx.db
+      .from('goals').select('id,title').eq('id', ctx.visionGoalId).maybeSingle()
+    visionGoal = v ?? null
+  }
+  return { workspace: ctx.workspaceName, user: user?.name, email: user?.email, visionGoal }
 }
 
 export async function listGoals(ctx: Ctx) {
@@ -110,8 +120,10 @@ export async function getActivityLog(ctx: Ctx, { limit = 15 } = {}) {
 
 // ── 書き込み ────────────────────────────────────────────
 export async function createGoal(ctx: Ctx, { title, parentId = null }: { title: string; parentId?: string | null }) {
+  // 親未指定なら大目標(北極星)の下にぶら下げる＝頂点構造を維持（設計A）。
+  const parent = parentId ?? ctx.visionGoalId ?? null
   const { data, error } = await ctx.db.from('goals')
-    .insert({ workspace_id: ctx.workspaceId, owner_id: ctx.userId, parent_id: parentId, title, progress: 0 })
+    .insert({ workspace_id: ctx.workspaceId, owner_id: ctx.userId, parent_id: parent, title, progress: 0 })
     .select().single()
   if (error) throw new Error(error.message)
   return data
@@ -254,7 +266,7 @@ export async function listComments(
 }
 
 export async function deleteTask(ctx: Ctx, { taskId }: { taskId: string }) {
-  // RLSで削除は owner/admin のみ許可。権限が無ければ0件削除＝実質no-op。
+  // RLSで削除は owner/admin、または自分が担当のタスクのみ許可。権限が無ければ0件削除＝実質no-op。
   const { error } = await ctx.db.from('tasks').delete().eq('id', taskId)
   if (error) throw new Error(error.message)
   return { deleted: taskId }

@@ -10,7 +10,7 @@ import TaskMeta from '../tasks/TaskMeta'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
-  const { current } = useWorkspace()
+  const { current, user } = useWorkspace()
   const canEditGoals = ['owner', 'admin'].includes(current?.role)
   const { todos, toggleTask, addTask, deleteTask, reload: reloadTodos } = useTodayTodo()
   const {
@@ -91,7 +91,7 @@ export default function TodayTodoPage() {
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
-                {canEditGoals && (
+                {(canEditGoals || todo.assignee_id === user?.id) && (
                   <button
                     onClick={() => {
                       if (confirm(`タスク「${todo.title}」を削除しますか？`)) deleteTask(todo)

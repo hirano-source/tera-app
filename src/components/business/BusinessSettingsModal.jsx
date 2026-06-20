@@ -198,7 +198,7 @@ export default function BusinessSettingsModal({ open, onClose }) {
           {/* 大目標 */}
           <section>
             <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-zinc-500">
-              <Target className="h-3.5 w-3.5" /> 事業の大目標（北極星）
+              <Target className="h-3.5 w-3.5" /> 事業の大目標
             </label>
             {vision ? (
               <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
