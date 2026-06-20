@@ -16,7 +16,7 @@ const INSTRUCTIONS = `TERA（目標達成型タスク管理）のMCP。コネク
 
 ゴールもタスクも「理想の状態 → 現状 → その差 →（手）」の型で考える。タスクを作る/更新するときは、ただのタイトルで終わらせず、可能なら次まで一緒に提案して埋めること（これがTERAの肝）：
 - idealState（理想の状態＝終わったらどうなってるか）/ currentState（現状）/ gap（その差＝詰まり・足りないもの）
-- approach（やること＝差を埋める具体的な一手）
+- approach（やること＝差を埋める具体的な一手）/ completionCriteria（完了の基準＝できた/できてないの判断）
 - priority（P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか）
 - startDueDate（着手期限）/ dueDate（完了期限）
 - recurrence（毎日/毎週/毎月のルーティンなら指定。突発・1回限りの重点案件は省略）
@@ -46,6 +46,7 @@ const S = {
       currentState: { type: 'string', description: '現状（今どうなってるか）' },
       gap: { type: 'string', description: 'その差（理想と現状のギャップ＝詰まり・足りないもの）' },
       approach: { type: 'string', description: 'やること（差を埋める具体的な一手）' },
+      completionCriteria: { type: 'string', description: '完了の基準（できた/できてないの判断＝何ができたら完了か）' },
       recurrence: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'ルーティンなら指定。重点案件は省略' },
     },
     required: ['title'],
@@ -64,6 +65,7 @@ const S = {
       currentState: { type: 'string', description: '現状' },
       gap: { type: 'string', description: 'その差' },
       approach: { type: 'string', description: 'やること' },
+      completionCriteria: { type: 'string', description: '完了の基準' },
       recurrence: { type: 'string', enum: ['daily', 'weekly', 'monthly'] },
       blockerType: { type: 'string', enum: ['data', 'approval', 'reply', 'external'], description: '詰まりの種類' },
       blockerOwner: { type: 'string', description: '誰待ちか' },

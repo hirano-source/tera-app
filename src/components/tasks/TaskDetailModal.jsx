@@ -101,6 +101,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
       current_state: t.current_state || null,
       gap: t.gap || null,
       approach: t.approach || null,
+      completion_criteria: t.completion_criteria || null,
       assignee_id: assignees[0] ?? null, // 主担当＝先頭
       blocker_type: blocked ? t.blocker_type || null : null,
       blocker_owner: blocked ? t.blocker_owner || null : null,
@@ -258,6 +259,15 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
                 value={t.approach || ''}
                 onChange={(e) => set('approach', e.target.value)}
                 placeholder="差を埋める具体的な一手"
+                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+            </Field>
+            <Field label="完了の基準（できた／できてないの判断）">
+              <textarea
+                rows={2}
+                value={t.completion_criteria || ''}
+                onChange={(e) => set('completion_criteria', e.target.value)}
+                placeholder="何ができたら完了と言えるか"
                 className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
               />
             </Field>
