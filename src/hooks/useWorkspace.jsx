@@ -36,17 +36,16 @@ export function WorkspaceProvider({ children }) {
       .eq('id', user.id)
       .maybeSingle()
     setProfile(me)
-    // 現在WSの優先順位：今表示中(prev) → DBのアクティブWS（MCPと共有）→ localStorage → 先頭
+    // 現在WSはサーバーのアクティブWS（users.active_workspace_id）を正とする
+    // ＝端末・Claudeが全部同じ事業に自動で揃う。localStorageは即時描画用キャッシュ、最後に先頭。
     const inList = (id) => id && list.some((w) => w.id === id)
-    setCurrentId((prev) =>
-      inList(prev)
-        ? prev
-        : inList(me?.active_workspace_id)
-          ? me.active_workspace_id
-          : inList(localStorage.getItem('ws'))
-            ? localStorage.getItem('ws')
-            : list[0]?.id ?? null,
-    )
+    const chosen = inList(me?.active_workspace_id)
+      ? me.active_workspace_id
+      : inList(localStorage.getItem('ws'))
+        ? localStorage.getItem('ws')
+        : list[0]?.id ?? null
+    if (chosen) localStorage.setItem('ws', chosen)
+    setCurrentId(chosen)
     setLoading(false)
   }, [user?.id])
 
