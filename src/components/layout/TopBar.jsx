@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Check, Plus, Trash2, Settings } from 'lucide-react'
+import { ChevronDown, Check, Plus, Trash2, Settings, RefreshCw } from 'lucide-react'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import SearchBox from './SearchBox'
 import teraSymbol from '../../assets/TERA_Symbol_Nega.png'
@@ -154,6 +154,15 @@ export default function TopBar({ onOpenBusiness }) {
       <div className="flex flex-1 justify-center px-3">
         <SearchBox />
       </div>
+
+      {/* 右: 更新（スマホは引っ張り更新が効かないのでボタンで） */}
+      <button
+        onClick={() => window.location.reload()}
+        title="更新（最新の状態に読み込み直す）"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-300 hover:bg-white/10 hover:text-white"
+      >
+        <RefreshCw className="h-4 w-4" />
+      </button>
       </div>
     </header>
   )

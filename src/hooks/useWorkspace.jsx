@@ -53,6 +53,23 @@ export function WorkspaceProvider({ children }) {
     reload()
   }, [reload])
 
+  // 即時同期：他端末やClaudeで現在WSが変わっても、アプリに戻った時／定期的に
+  // サーバーのアクティブWSを読み直して反映する（更新ボタンを押さなくても揃う）。
+  useEffect(() => {
+    if (!user?.id) return
+    const sync = () => {
+      if (!document.hidden) reload()
+    }
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', sync)
+    const iv = setInterval(sync, 20000)
+    return () => {
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', sync)
+      clearInterval(iv)
+    }
+  }, [user?.id, reload])
+
   const setCurrent = (id) => {
     setCurrentId(id)
     localStorage.setItem('ws', id)
