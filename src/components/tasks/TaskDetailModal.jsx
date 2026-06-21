@@ -33,6 +33,8 @@ const BLOCKER = [
   { v: 'reply', label: '返信待ち' },
   { v: 'external', label: '外部待ち' },
 ]
+const taCls = 'w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500'
+const dateCls = 'w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-zinc-500'
 
 export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
   const { current, currentId, user } = useWorkspace()
@@ -43,10 +45,12 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [members, setMembers] = useState([])
   const [assignees, setAssignees] = useState([]) // 担当（複数）user_id配列
+  const [showDeep, setShowDeep] = useState(false) // 理想/現状/差（深掘り）の表示
 
   useEffect(() => {
     if (!open || !taskId) return
     setT(null)
+    setShowDeep(false)
     let active = true
     ;(async () => {
       const { data } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle()
@@ -160,131 +164,105 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
         {!t ? (
           <div className="grid flex-1 place-items-center text-zinc-400">読み込み中…</div>
         ) : (
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-            <Field label="タイトル">
-              <input
-                value={t.title || ''}
-                onChange={(e) => set('title', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            </Field>
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            {/* タイトル＝見出しとして大きく（枠は控えめ） */}
+            <input
+              value={t.title || ''}
+              onChange={(e) => set('title', e.target.value)}
+              placeholder="タイトル"
+              className="w-full rounded-lg border border-transparent px-2 py-1.5 text-lg font-semibold text-zinc-900 outline-none hover:border-zinc-200 focus:border-zinc-300"
+            />
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="状態">
-                <Select value={t.status || 'todo'} onChange={(v) => set('status', v)} options={STATUS} />
-              </Field>
-              <Field label="優先度">
-                <Select value={t.priority || 'P2'} onChange={(v) => set('priority', v)} options={PRIORITY} />
-              </Field>
-            </div>
-
-            <Field label="区分">
-              <Select value={t.recurrence || ''} onChange={(v) => set('recurrence', v)} options={RECURRENCE} />
-            </Field>
-
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2.5">
-              <input
-                type="checkbox"
-                checked={!!t.is_today}
-                onChange={(e) => set('is_today', e.target.checked)}
-                className="h-4 w-4 accent-brand"
-              />
-              <span className="text-sm text-zinc-700">今日のToDoに表示する</span>
-              <span className="ml-auto text-xs text-zinc-400">オフ＝予定リストだけに置く</span>
-            </label>
-
-            <Field label="担当（複数可）">
-              <div className="flex flex-wrap gap-1.5">
-                {members.map((m) => {
-                  const on = assignees.includes(m.id)
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => toggleAssignee(m.id)}
-                      className={cn(
-                        'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
-                        on ? 'border-brand bg-brand/10 text-brand' : 'border-zinc-300 text-zinc-500 hover:bg-zinc-50',
-                      )}
-                    >
-                      <span
-                        className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
-                        style={{ backgroundColor: m.avatar_color || '#6d5dfc' }}
-                      >
-                        {m.is_bot ? <Bot className="h-2.5 w-2.5" /> : (m.name || '?').charAt(0).toUpperCase()}
-                      </span>
-                      {m.name}
-                    </button>
-                  )
-                })}
-                {members.length === 0 && <span className="text-xs text-zinc-400">メンバーがいません</span>}
+            {/* 属性：状態・優先度・期限・区分・今日・担当を1か所に凝縮＝ぱっと見て分かる */}
+            <div className="space-y-2.5 rounded-xl bg-zinc-50 p-3">
+              <div className="grid grid-cols-2 gap-2.5">
+                <Field label="状態">
+                  <Select value={t.status || 'todo'} onChange={(v) => set('status', v)} options={STATUS} />
+                </Field>
+                <Field label="優先度">
+                  <Select value={t.priority || 'P2'} onChange={(v) => set('priority', v)} options={PRIORITY} />
+                </Field>
+                <Field label="着手期限">
+                  <input type="date" value={t.start_due_date || ''} onChange={(e) => set('start_due_date', e.target.value)} className={dateCls} />
+                </Field>
+                <Field label="完了期限">
+                  <input type="date" value={t.due_date || ''} onChange={(e) => set('due_date', e.target.value)} className={dateCls} />
+                </Field>
+                <Field label="区分">
+                  <Select value={t.recurrence || ''} onChange={(v) => set('recurrence', v)} options={RECURRENCE} />
+                </Field>
+                <Field label="今日のToDo">
+                  <button
+                    type="button"
+                    onClick={() => set('is_today', !t.is_today)}
+                    className={cn(
+                      'h-[38px] w-full rounded-lg border text-sm',
+                      t.is_today ? 'border-brand bg-brand/10 font-medium text-brand' : 'border-zinc-300 text-zinc-500',
+                    )}
+                  >
+                    {t.is_today ? '今日やる' : '予定だけ'}
+                  </button>
+                </Field>
               </div>
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="着手期限">
-                <input
-                  type="date"
-                  value={t.start_due_date || ''}
-                  onChange={(e) => set('start_due_date', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                />
-              </Field>
-              <Field label="完了期限">
-                <input
-                  type="date"
-                  value={t.due_date || ''}
-                  onChange={(e) => set('due_date', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                />
+              <Field label="担当（複数可）">
+                <div className="flex flex-wrap gap-1.5">
+                  {members.map((m) => {
+                    const on = assignees.includes(m.id)
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggleAssignee(m.id)}
+                        className={cn(
+                          'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
+                          on ? 'border-brand bg-brand/10 text-brand' : 'border-zinc-300 bg-white text-zinc-500 hover:bg-zinc-50',
+                        )}
+                      >
+                        <span
+                          className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                          style={{ backgroundColor: m.avatar_color || '#6d5dfc' }}
+                        >
+                          {m.is_bot ? <Bot className="h-2.5 w-2.5" /> : (m.name || '?').charAt(0).toUpperCase()}
+                        </span>
+                        {m.name}
+                      </button>
+                    )
+                  })}
+                  {members.length === 0 && <span className="text-xs text-zinc-400">メンバーがいません</span>}
+                </div>
               </Field>
             </div>
 
-            <Field label="理想の状態">
-              <textarea
-                rows={2}
-                value={t.ideal_state || ''}
-                onChange={(e) => set('ideal_state', e.target.value)}
-                placeholder="終わったらどうなってるか"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            </Field>
-            <Field label="現状">
-              <textarea
-                rows={2}
-                value={t.current_state || ''}
-                onChange={(e) => set('current_state', e.target.value)}
-                placeholder="今どうなってるか"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            </Field>
-            <Field label="その差">
-              <textarea
-                rows={2}
-                value={t.gap || ''}
-                onChange={(e) => set('gap', e.target.value)}
-                placeholder="理想と現状のギャップ・詰まり・足りないもの"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
-            </Field>
+            {/* やること・完了基準＝主役。スクロールせず見える位置に。 */}
             <Field label="やること">
-              <textarea
-                rows={2}
-                value={t.approach || ''}
-                onChange={(e) => set('approach', e.target.value)}
-                placeholder="差を埋める具体的な一手"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
+              <textarea rows={2} value={t.approach || ''} onChange={(e) => set('approach', e.target.value)} placeholder="差を埋める具体的な一手" className={taCls} />
             </Field>
             <Field label="完了の基準（できた／できてないの判断）">
-              <textarea
-                rows={2}
-                value={t.completion_criteria || ''}
-                onChange={(e) => set('completion_criteria', e.target.value)}
-                placeholder="何ができたら完了と言えるか"
-                className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-              />
+              <textarea rows={2} value={t.completion_criteria || ''} onChange={(e) => set('completion_criteria', e.target.value)} placeholder="何ができたら完了と言えるか" className={taCls} />
             </Field>
+
+            {/* 深掘り（理想→現状→差）：中身がある／開いたときだけ表示＝ふだんは短く */}
+            {showDeep || t.ideal_state || t.current_state || t.gap ? (
+              <div className="space-y-3">
+                <Field label="理想の状態">
+                  <textarea rows={2} value={t.ideal_state || ''} onChange={(e) => set('ideal_state', e.target.value)} placeholder="終わったらどうなってるか" className={taCls} />
+                </Field>
+                <Field label="現状">
+                  <textarea rows={2} value={t.current_state || ''} onChange={(e) => set('current_state', e.target.value)} placeholder="今どうなってるか" className={taCls} />
+                </Field>
+                <Field label="その差">
+                  <textarea rows={2} value={t.gap || ''} onChange={(e) => set('gap', e.target.value)} placeholder="理想と現状のギャップ・詰まり" className={taCls} />
+                </Field>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeep(true)}
+                className="text-xs font-medium text-zinc-400 hover:text-zinc-600"
+              >
+                ＋ 深掘り（理想・現状・差）を追加
+              </button>
+            )}
 
             {t.status === 'blocked' && (
               <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -314,7 +292,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
             {/* コメント / 議事録（このタスクに文脈が溜まる。Claudeも書き込める） */}
             <div>
               <span className="mb-1 block text-xs font-medium text-zinc-500">コメント / 議事録</span>
-              <div className="h-72 overflow-hidden rounded-lg border border-zinc-200">
+              <div className="h-56 overflow-hidden rounded-lg border border-zinc-200">
                 <CommentThread targetType="task" targetId={t.id} members={members} className="h-full" />
               </div>
             </div>
