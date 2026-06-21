@@ -87,7 +87,7 @@ export default function TodayTodoPage() {
                 <button
                   onClick={() => setOpenTaskId(todo.id)}
                   className={
-                    'flex-1 truncate text-left ' +
+                    'min-w-0 flex-1 truncate text-left ' +
                     (todo.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')
                   }
                 >

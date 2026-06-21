@@ -305,7 +305,7 @@ export default function GoalDetailPage() {
                   </button>
                   <button
                     onClick={() => setOpenTaskId(t.id)}
-                    className={cn('flex-1 truncate text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
+                    className={cn('min-w-0 flex-1 truncate text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
                   >
                     {t.title}
                   </button>

@@ -105,7 +105,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             <button onClick={() => onOpenTask?.(node)} className="min-w-0 flex-1 text-left">
               <span
                 className={cn(
-                  'truncate text-sm',
+                  'block truncate text-sm',
                   node.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700',
                 )}
               >
