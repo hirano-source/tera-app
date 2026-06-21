@@ -105,9 +105,8 @@ export function useGoalTree() {
     await load()
   }
 
-  // ゴール配下にタスクを追加（parentTaskId 指定で入れ子。goal_idは親と同じ）。
-  // size=粒度（大/中/小/サブ）。入れ子で作るときは呼び出し側が「親より1段小さい」を渡す。
-  const addTask = async (goalId, title, parentTaskId = null, size = null) => {
+  // ゴール配下にタスクを追加（parentTaskId 指定で入れ子＝1段下の粒度。goal_idは親と同じ）。
+  const addTask = async (goalId, title, parentTaskId = null) => {
     const text = title.trim()
     if (!text || !currentId) return
     await supabase.from('tasks').insert({
@@ -119,7 +118,6 @@ export function useGoalTree() {
       is_today: false,
       for_date: today(),
       source: 'goal',
-      size,
     })
     await load()
   }

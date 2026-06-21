@@ -33,7 +33,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
   )
 }
 
-function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals }) {
+function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals }) {
   const navigate = useNavigate()
   const isGoal = node.kind === 'goal'
   const children = node.children ?? []
@@ -56,14 +56,14 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
     setOpen(true)
   }
 
-  // 入力確定：ゴール→子ゴール/タスク、タスク→入れ子タスク（goal_idは親と同じ）。
-  // 入れ子で作るタスクは「親より1段小さい粒度」を既定にする（大→中→小→サブ）。
+  // 入力確定：ゴール→子ゴール/タスク、タスク→1段下の入れ子タスク（goal_idは親と同じ）。
+  // 粒度は「階層の深さ」で表すので、追加位置がそのまま大→中→小→サブになる。
   const submitAdd = async () => {
     const t = text.trim()
     if (t) {
       if (addMode === 'goal') await onAddGoal(t, node.id)
       else if (isGoal) await onAddTask(node.id, t)
-      else await onAddTask(node.goal_id, t, node.id, nextSize(node.size))
+      else await onAddTask(node.goal_id, t, node.id)
     }
     setText('')
     setAddMode(null)
@@ -92,7 +92,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
               className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
             >
               <ProgressBadge value={goalPct} />
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-900">{node.title}</span>
+              <span className="min-w-0 flex-1 truncate text-[17px] font-semibold text-zinc-900">{node.title}</span>
             </button>
             {taskCount.total > 0 && (
               <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">
@@ -107,14 +107,12 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             <span className={cn('h-6 w-1 shrink-0 rounded-full', PRIORITY_ACCENT[node.priority] ?? 'bg-transparent')} />
             {/* 状態＝丸アイコン1つ（タップで 未着手→進行中→完了 を巡回）*/}
             <StatusCircle status={node.status} onClick={() => onToggleTask(node)} />
-            {/* 粒度＝大/中/小/サブ（設定済みのときだけ。無印は出さない） */}
-            <SizeChip size={node.size} />
-            {/* タイトル＝主役。タップで詳細を開く。 */}
+            {/* タイトル＝主役。粒度は「深さ」で表す：大ほど大きく濃く、サブほど控えめに。 */}
             <button onClick={() => onOpenTask?.(node)} className="min-w-0 flex-1 text-left">
               <span
                 className={cn(
-                  'block truncate text-sm',
-                  node.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700',
+                  'block truncate',
+                  node.status === 'done' ? 'text-zinc-400 line-through' : TITLE_BY_DEPTH[Math.min(taskDepth, 3)],
                 )}
               >
                 {node.title}
@@ -205,6 +203,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
                   node={child}
                   users={users}
                   depth={depth + 1}
+                  taskDepth={isGoal ? 0 : taskDepth + 1}
                   onToggleTask={onToggleTask}
                   onAddTask={onAddTask}
                   onAddGoal={onAddGoal}
@@ -292,41 +291,15 @@ function ToolButton({ title, onClick, children }) {
 // 優先度の左色帯（緊急度を色だけで伝える。P2以下は無印＝ノイズにしない）
 export const PRIORITY_ACCENT = { P0: 'bg-red-500', P1: 'bg-amber-400' }
 
-// 粒度（工数の大きさ）。緊急度(色)とは別軸なのでグレースケールで表す。
-// 大＝濃い→サブ＝薄い枠線、で「大きさ」が一目で分かる。時間目安は title に出す。
-const SIZE_META = {
-  big: { label: '大', cls: 'bg-zinc-700 text-white' },
-  mid: { label: '中', cls: 'bg-zinc-300 text-zinc-700' },
-  small: { label: '小', cls: 'bg-zinc-100 text-zinc-500' },
-  sub: { label: 'サブ', cls: 'border border-zinc-300 text-zinc-400' },
-}
-const SIZE_HINT = {
-  big: '大タスク（〜3ヶ月）',
-  mid: '中タスク（〜1週間）',
-  small: '小タスク（〜3日）',
-  sub: 'サブタスク（〜3時間）',
-}
-const SIZE_ORDER = ['big', 'mid', 'small', 'sub']
-// 1段小さい粒度を返す（入れ子で子タスクを作るときの既定）。親が未設定なら子も未設定。
-function nextSize(size) {
-  const i = SIZE_ORDER.indexOf(size)
-  if (i < 0) return null
-  return SIZE_ORDER[Math.min(i + 1, SIZE_ORDER.length - 1)]
-}
-
-// 粒度バッジ（設定済みのときだけ表示）。
-export function SizeChip({ size }) {
-  const m = SIZE_META[size]
-  if (!m) return null
-  return (
-    <span
-      className={cn('flex h-5 shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold leading-none', m.cls)}
-      title={SIZE_HINT[size]}
-    >
-      {m.label}
-    </span>
-  )
-}
+// 粒度＝階層の深さで表す（バッジは置かない）。深いほど小さく控えめに。
+// 大(0)＝大きく濃い → 中(1) → 小(2) → サブ(3以降)＝小さめ。インデントと合わせて
+// 「どれが大タスクで、どれがその中の作業か」がぱっと見て分かる。
+const TITLE_BY_DEPTH = [
+  'text-[17px] font-semibold text-zinc-900', // 大
+  'text-[15px] font-medium text-zinc-800',   // 中
+  'text-sm font-medium text-zinc-700',       // 小
+  'text-sm text-zinc-600',                    // サブ以降
+]
 
 // タスクの状態＝丸アイコン1つ。タップで 未着手→進行中→完了 を巡回。
 // 未着手は中空の丸、進行中は青、完了は緑、待ちは琥珀。形は同じで色で状態を示す。

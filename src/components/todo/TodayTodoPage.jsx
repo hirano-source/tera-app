@@ -4,7 +4,7 @@ import { Plus, Check, Trash2, Compass } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
-import GoalTree, { PRIORITY_ACCENT, DueDate, SizeChip } from '../goals/GoalTree'
+import GoalTree, { PRIORITY_ACCENT, DueDate } from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
 import TaskDetailModal from '../tasks/TaskDetailModal'
 
@@ -85,11 +85,10 @@ export default function TodayTodoPage() {
                 >
                   {todo.status === 'done' && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                 </button>
-                <SizeChip size={todo.size} />
                 <button
                   onClick={() => setOpenTaskId(todo.id)}
                   className={
-                    'min-w-0 flex-1 truncate text-left ' +
+                    'min-w-0 flex-1 truncate text-left text-[15px] font-medium ' +
                     (todo.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')
                   }
                 >

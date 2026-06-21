@@ -20,14 +20,6 @@ const PRIORITY = [
   { v: 'P3', label: 'P3 〆切あり' },
   { v: 'P4', label: 'P4 いつか' },
 ]
-// 粒度（工数の大きさ）。緊急度(priority)とは別軸。時間は目安。
-const SIZE = [
-  { v: '', label: '—（未設定）' },
-  { v: 'big', label: '大（〜3ヶ月）' },
-  { v: 'mid', label: '中（〜1週間）' },
-  { v: 'small', label: '小（〜3日）' },
-  { v: 'sub', label: 'サブ（〜3時間）' },
-]
 const RECURRENCE = [
   { v: '', label: '重点案件（1回限り）' },
   { v: 'daily', label: '毎日' },
@@ -104,7 +96,6 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
       title: t.title,
       status: t.status,
       priority: t.priority || 'P2',
-      size: t.size || null,
       recurrence: t.recurrence || null,
       start_due_date: t.start_due_date || null,
       due_date: t.due_date || null,
@@ -186,14 +177,9 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="粒度（大きさ）">
-                <Select value={t.size || ''} onChange={(v) => set('size', v)} options={SIZE} />
-              </Field>
-              <Field label="区分">
-                <Select value={t.recurrence || ''} onChange={(v) => set('recurrence', v)} options={RECURRENCE} />
-              </Field>
-            </div>
+            <Field label="区分">
+              <Select value={t.recurrence || ''} onChange={(v) => set('recurrence', v)} options={RECURRENCE} />
+            </Field>
 
             <Field label="担当（複数可）">
               <div className="flex flex-wrap gap-1.5">
