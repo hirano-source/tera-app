@@ -37,6 +37,21 @@ export default function TodayTodoPage() {
     ? tree.flatMap((n) => (n.id === visionGoalId ? n.children : [n]))
     : tree
 
+  // 上の「今日のToDo」と下のツリーは同じタスクを別フックで保持している。
+  // 片方を操作したら、もう片方も再取得して整合を取る（完了切替・削除が両方に反映される）。
+  const handleToggleTodo = async (todo) => {
+    await toggleTask(todo)
+    reloadTree()
+  }
+  const handleToggleTreeTask = async (node) => {
+    await toggleGoalTask(node)
+    reloadTodos()
+  }
+  const handleDeleteTodo = async (todo) => {
+    await deleteTask(todo)
+    reloadTree()
+  }
+
   const submitTask = async () => {
     await addTask(taskText)
     setTaskText('')
@@ -76,7 +91,7 @@ export default function TodayTodoPage() {
                 {/* 優先度＝左の色帯（ツリーと統一） */}
                 <span className={'h-6 w-1 shrink-0 rounded-full ' + (PRIORITY_ACCENT[todo.priority] ?? 'bg-transparent')} />
                 <button
-                  onClick={() => toggleTask(todo)}
+                  onClick={() => handleToggleTodo(todo)}
                   className={
                     todo.status === 'done'
                       ? 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white'
@@ -98,7 +113,7 @@ export default function TodayTodoPage() {
                 {(canEditGoals || todo.assignee_id === user?.id) && (
                   <button
                     onClick={() => {
-                      if (confirm(`タスク「${todo.title}」を削除しますか？`)) deleteTask(todo)
+                      if (confirm(`タスク「${todo.title}」を削除しますか？`)) handleDeleteTodo(todo)
                     }}
                     title="削除"
                     className="hidden shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500 group-hover:block"
@@ -153,7 +168,7 @@ export default function TodayTodoPage() {
         <GoalTree
           tree={displayTree}
           users={users}
-          onToggleTask={toggleGoalTask}
+          onToggleTask={handleToggleTreeTask}
           onAddTask={addGoalTask}
           onAddGoal={createGoal}
           onAssignOwner={assignOwner}
