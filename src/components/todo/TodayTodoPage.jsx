@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Check, ChevronRight, Trash2, Compass } from 'lucide-react'
+import { Plus, Check, Trash2, Compass } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
-import GoalTree from '../goals/GoalTree'
+import GoalTree, { PRIORITY_ACCENT, DueDate, SizeChip } from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
 import TaskDetailModal from '../tasks/TaskDetailModal'
-import TaskMeta from '../tasks/TaskMeta'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
@@ -72,18 +71,21 @@ export default function TodayTodoPage() {
             {todos.map((todo) => (
               <li
                 key={todo.id}
-                className="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-zinc-50"
+                className="group flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-zinc-50"
               >
+                {/* 優先度＝左の色帯（ツリーと統一） */}
+                <span className={'h-6 w-1 shrink-0 rounded-full ' + (PRIORITY_ACCENT[todo.priority] ?? 'bg-transparent')} />
                 <button
                   onClick={() => toggleTask(todo)}
                   className={
                     todo.status === 'done'
-                      ? 'flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500 text-white'
-                      : 'h-5 w-5 rounded-md border-2 border-zinc-300 hover:border-emerald-400'
+                      ? 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white'
+                      : 'h-5 w-5 shrink-0 rounded-md border-2 border-zinc-300 hover:border-emerald-400'
                   }
                 >
                   {todo.status === 'done' && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                 </button>
+                <SizeChip size={todo.size} />
                 <button
                   onClick={() => setOpenTaskId(todo.id)}
                   className={
@@ -93,21 +95,14 @@ export default function TodayTodoPage() {
                 >
                   {todo.title}
                 </button>
-                <TaskMeta task={todo} />
-                <button
-                  onClick={() => setOpenTaskId(todo.id)}
-                  title="詳細を開く"
-                  className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                <DueDate date={todo.due_date} done={todo.status === 'done'} />
                 {(canEditGoals || todo.assignee_id === user?.id) && (
                   <button
                     onClick={() => {
                       if (confirm(`タスク「${todo.title}」を削除しますか？`)) deleteTask(todo)
                     }}
                     title="削除"
-                    className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+                    className="hidden shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500 group-hover:block"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

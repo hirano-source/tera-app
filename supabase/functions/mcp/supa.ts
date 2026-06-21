@@ -194,9 +194,9 @@ async function buildManual(ctx: Ctx, visionGoal: { id: string; title: string } |
 }
 
 // WS非依存の取扱説明（構造とルールの要点）。常時ルールの“控え”＝クライアントが instructions を無視しても効くように同梱。
-const MANUAL_STATIC = `【TERAの構造】事業 → 大目標（頂点）→ ゴール → タスク → サブタスク（2段まで）。
+const MANUAL_STATIC = `【TERAの構造】事業 → 大目標（頂点）→ ゴール → タスク。タスクは粒度(size)に応じて何段でも入れ子にでき、大→中→小→サブ とブレイクダウンする。
 ゴールもタスクも「理想の状態 → 現状 → その差(gap) → やること(approach)」の型で考える。
-タスクの主なフィールド: completionCriteria(完了の基準) / approach(やること) / priority(P0今日中/P1今週/P2来週/P3〆切あり/P4いつか) / startDueDate(着手期限) / dueDate(完了期限) / recurrence(daily/weekly/monthly。突発・重点案件は省略) / assigneeId(担当) / goalId(紐づくゴール)。
+タスクの主なフィールド: size(粒度=工数の大きさ: big≒3ヶ月/mid≒1週間/small≒3日/sub≒3時間。緊急度priorityとは別軸。入れ子の子は親より1段小さく) / completionCriteria(完了の基準) / approach(やること) / priority(P0今日中/P1今週/P2来週/P3〆切あり/P4いつか) / startDueDate(着手期限) / dueDate(完了期限) / recurrence(daily/weekly/monthly。突発・重点案件は省略) / assigneeId(担当) / goalId(紐づくゴール)。
 詰まったら status=blocked にし blockerType(data/approval/reply/external)/blockerOwner(誰待ち)/blockerNote を入れる。
 
 【あなたの動き方（記録係で終わらない）】
@@ -323,6 +323,7 @@ export async function updateGoal(
 type TaskFields = {
   goalId?: string | null
   parentTaskId?: string | null
+  size?: string | null
   priority?: string
   dueDate?: string | null
   startDueDate?: string | null
@@ -338,6 +339,7 @@ type TaskFields = {
 function applyTaskFields(row: Record<string, unknown>, a: TaskFields) {
   if (a.goalId !== undefined) row.goal_id = a.goalId
   if (a.parentTaskId !== undefined) row.parent_task_id = a.parentTaskId
+  if (a.size !== undefined) row.size = a.size
   if (a.priority !== undefined) row.priority = a.priority
   if (a.dueDate !== undefined) row.due_date = a.dueDate
   if (a.startDueDate !== undefined) row.start_due_date = a.startDueDate

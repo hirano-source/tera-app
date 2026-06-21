@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronRight, Play, Check, Pause, Circle,
-  ListPlus, GitBranchPlus, Maximize2, Users, X, MessageSquare, Trash2,
+  ListPlus, GitBranchPlus, Maximize2, Users, X, Trash2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
-import TaskMeta from '../tasks/TaskMeta'
 
-// スキルツリー：ゴール/タスクのノードを接続線付きで再帰表示する。
+// スキルツリー：ゴール/タスクのノードを再帰表示する。
+// 設計方針：タイトルを主役に、装飾は最小限。状態＝左の丸アイコン1つ、
+// 優先度＝左の色帯（赤P0/橙P1）、担当＝小さめアイコン、日付＝小さく右。
+// 操作アイコンはホバー時のみ（スマホは行タップで詳細を開く）。
 // canEditGoals=false（メンバー）はゴールの追加・担当割当を出さない（タスクは全員可）。
 export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals = true }) {
   return (
@@ -41,7 +43,7 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
   const [text, setText] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
 
-  const owner = isGoal ? users[node.owner_id] : users[node.assignee_id]
+  const owner = isGoal ? users[node.owner_id] : null
   const taskCount = isGoal ? countOwnTasks(node) : null
   // ゴールの進捗％＝タスク完了から自動計算（タスクが無ければ手入力progress）
   const goalPct =
@@ -54,15 +56,14 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
     setOpen(true)
   }
 
-  const isSubtask = !isGoal && !!node.parent_task_id
-
-  // 入力確定：ゴール→子ゴール/タスク、タスク→サブタスク（goal_idは親と同じ）
+  // 入力確定：ゴール→子ゴール/タスク、タスク→入れ子タスク（goal_idは親と同じ）。
+  // 入れ子で作るタスクは「親より1段小さい粒度」を既定にする（大→中→小→サブ）。
   const submitAdd = async () => {
     const t = text.trim()
     if (t) {
       if (addMode === 'goal') await onAddGoal(t, node.id)
       else if (isGoal) await onAddTask(node.id, t)
-      else await onAddTask(node.goal_id, t, node.id)
+      else await onAddTask(node.goal_id, t, node.id, nextSize(node.size))
     }
     setText('')
     setAddMode(null)
@@ -70,38 +71,45 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
 
   return (
     <div>
-      <div className="group flex items-center gap-2 rounded-lg py-1.5 pr-2 hover:bg-zinc-50">
+      <div className="group flex items-center gap-2.5 rounded-lg py-2 pr-2 hover:bg-zinc-50">
         {/* 展開トグル */}
         {hasChildren ? (
           <button
             onClick={() => setOpen((v) => !v)}
-            className="flex h-5 w-5 items-center justify-center text-zinc-400 hover:text-zinc-700"
+            className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-400 hover:text-zinc-700"
           >
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
         ) : (
-          <span className="h-5 w-5" />
+          <span className="h-5 w-5 shrink-0" />
         )}
 
         {/* ノード本体 */}
         {isGoal ? (
-          <button
-            onClick={() => navigate(`/goals/${node.id}`)}
-            className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          >
-            <ProgressBadge value={goalPct} />
-            <span className="truncate text-sm font-semibold text-zinc-900">{node.title}</span>
+          <>
+            <button
+              onClick={() => navigate(`/goals/${node.id}`)}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            >
+              <ProgressBadge value={goalPct} />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-900">{node.title}</span>
+            </button>
+            {taskCount.total > 0 && (
+              <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">
+                {taskCount.done}/{taskCount.total}
+              </span>
+            )}
             {owner && <Avatar user={owner} />}
-          </button>
+          </>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            {/* 一番左＝担当者（主担当を大きく、残りはまとめて） */}
-            <AssigneeStack ids={node.assigneeIds} users={users} />
-            {/* 状態ラベル：タップで 未着手→進行中→完了 を巡回 */}
-            <StatusPill
-              status={node.status}
-              onClick={() => onToggleTask(node)}
-            />
+          <>
+            {/* 優先度＝左の色帯（赤P0/橙P1、それ以下は無印）。色だけで緊急度が分かる。 */}
+            <span className={cn('h-6 w-1 shrink-0 rounded-full', PRIORITY_ACCENT[node.priority] ?? 'bg-transparent')} />
+            {/* 状態＝丸アイコン1つ（タップで 未着手→進行中→完了 を巡回）*/}
+            <StatusCircle status={node.status} onClick={() => onToggleTask(node)} />
+            {/* 粒度＝大/中/小/サブ（設定済みのときだけ。無印は出さない） */}
+            <SizeChip size={node.size} />
+            {/* タイトル＝主役。タップで詳細を開く。 */}
             <button onClick={() => onOpenTask?.(node)} className="min-w-0 flex-1 text-left">
               <span
                 className={cn(
@@ -112,34 +120,17 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
                 {node.title}
               </span>
             </button>
-          </div>
+            <DueDate date={node.due_date} done={node.status === 'done'} />
+            <AssigneeStack ids={node.assigneeIds} users={users} />
+          </>
         )}
 
-        {/* メタ：ゴールは完了数/全体（動的に集計＝完了で動く）＋コメント数、タスクは優先度等 */}
-        {isGoal
-          ? (taskCount.total > 0 || node.commentCount > 0) && (
-              <span className="flex shrink-0 items-center gap-2 text-xs text-zinc-400">
-                {taskCount.total > 0 && (
-                  <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
-                    {taskCount.done}/{taskCount.total}
-                  </span>
-                )}
-                {node.commentCount > 0 && (
-                  <span className="flex items-center gap-0.5">
-                    <MessageSquare className="h-3 w-3" />
-                    {node.commentCount}
-                  </span>
-                )}
-              </span>
-            )
-          : <TaskMeta task={node} commentCount={node.commentCount} />}
-
-        {/* ホバーで出るクイック操作バー（本家のグレーのアイコン列に相当） */}
+        {/* ゴールのホバー操作（追加・割当・詳細・削除）。スマホでは隠れる＝ふだんスッキリ。 */}
         {isGoal && (
           <div
             className={cn(
-              'flex items-center gap-1 transition-opacity',
-              pickerOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+              'shrink-0 items-center gap-1',
+              pickerOpen ? 'flex' : 'hidden group-hover:flex',
             )}
           >
             <ToolButton title="タスクを追加" onClick={() => startAdd('task')}>
@@ -185,24 +176,17 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
           </div>
         )}
 
-        {/* タスク：サブタスク追加（上位タスクのみ）＋詳細（常時表示＝スマホのタップでも届く） */}
+        {/* タスクのホバー操作（1段小さいタスクを追加＝ブレイクダウン）。ふだんは隠す。 */}
         {!isGoal && (
-          <div className="flex items-center gap-1">
-            {!isSubtask && (
-              <ToolButton title="サブタスクを追加" onClick={() => startAdd('task')}>
-                <ListPlus className="h-4 w-4" />
-              </ToolButton>
-            )}
-            {onOpenTask && (
-              <ToolButton title="詳細を開く" onClick={() => onOpenTask(node)}>
-                <Maximize2 className="h-4 w-4" />
-              </ToolButton>
-            )}
+          <div className="hidden shrink-0 items-center gap-1 group-hover:flex">
+            <ToolButton title="1段小さいタスクを追加（ブレイクダウン）" onClick={() => startAdd('task')}>
+              <ListPlus className="h-4 w-4" />
+            </ToolButton>
           </div>
         )}
       </div>
 
-      {/* 子（ツリーの枝分かれ線 ├─ └─ で親子を明示） */}
+      {/* 子（細い接続線でゆるく親子を示す） */}
       {open && (hasChildren || addMode) && (
         <div className="ml-3">
           {children.map((child, i) => {
@@ -212,9 +196,9 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
                 key={child.id}
                 className={cn(
                   'relative pl-4',
-                  "before:absolute before:left-0 before:top-0 before:w-px before:bg-zinc-300 before:content-['']",
-                  isLastRow ? 'before:h-5' : 'before:h-full',
-                  "after:absolute after:left-0 after:top-5 after:h-px after:w-4 after:bg-zinc-300 after:content-['']",
+                  "before:absolute before:left-0 before:top-0 before:w-px before:bg-zinc-200 before:content-['']",
+                  isLastRow ? 'before:h-6' : 'before:h-full',
+                  "after:absolute after:left-0 after:top-6 after:h-px after:w-4 after:bg-zinc-200 after:content-['']",
                 )}
               >
                 <Node
@@ -233,14 +217,14 @@ function Node({ node, users, depth, onToggleTask, onAddTask, onAddGoal, onAssign
             )
           })}
           {addMode && (
-            <div className="relative flex items-center gap-3 py-1.5 pl-4 before:absolute before:left-0 before:top-0 before:h-5 before:w-px before:bg-zinc-300 before:content-[''] after:absolute after:left-0 after:top-5 after:h-px after:w-4 after:bg-zinc-300 after:content-['']">
+            <div className="relative flex items-center gap-3 py-1.5 pl-4 before:absolute before:left-0 before:top-0 before:h-6 before:w-px before:bg-zinc-200 before:content-[''] after:absolute after:left-0 after:top-6 after:h-px after:w-4 after:bg-zinc-200 after:content-['']">
               <span className="h-5 w-5" />
               {addMode === 'goal' ? (
                 <span className="flex h-7 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-brand/40 px-1.5 text-[10px] font-bold text-brand">
                   0%
                 </span>
               ) : (
-                <span className="h-7 w-7 shrink-0 rounded-full border-2 border-dashed border-zinc-300" />
+                <Circle className="h-5 w-5 shrink-0 text-zinc-300" />
               )}
               <input
                 autoFocus
@@ -305,30 +289,75 @@ function ToolButton({ title, onClick, children }) {
   )
 }
 
-// タスクの状態ラベル（タップで巡回）。アイコン＋文字＋色で一目で分かるように。
-// 進行中は青＝ゴール（紫）と色を分け、「作業中」がはっきり区別できる。
-const STATUS_VISUAL = {
-  todo: { label: '未着手', cls: 'border border-zinc-300 bg-white text-zinc-500', icon: <Circle className="h-3 w-3" /> },
-  doing: { label: '進行中', cls: 'bg-blue-100 text-blue-700', icon: <Play className="h-3 w-3 fill-blue-700" /> },
-  done: { label: '完了', cls: 'bg-emerald-100 text-emerald-700', icon: <Check className="h-3 w-3" strokeWidth={3} /> },
-  blocked: { label: '待ち', cls: 'bg-amber-100 text-amber-700', icon: <Pause className="h-3 w-3 fill-amber-700" /> },
+// 優先度の左色帯（緊急度を色だけで伝える。P2以下は無印＝ノイズにしない）
+export const PRIORITY_ACCENT = { P0: 'bg-red-500', P1: 'bg-amber-400' }
+
+// 粒度（工数の大きさ）。緊急度(色)とは別軸なのでグレースケールで表す。
+// 大＝濃い→サブ＝薄い枠線、で「大きさ」が一目で分かる。時間目安は title に出す。
+const SIZE_META = {
+  big: { label: '大', cls: 'bg-zinc-700 text-white' },
+  mid: { label: '中', cls: 'bg-zinc-300 text-zinc-700' },
+  small: { label: '小', cls: 'bg-zinc-100 text-zinc-500' },
+  sub: { label: 'サブ', cls: 'border border-zinc-300 text-zinc-400' },
+}
+const SIZE_HINT = {
+  big: '大タスク（〜3ヶ月）',
+  mid: '中タスク（〜1週間）',
+  small: '小タスク（〜3日）',
+  sub: 'サブタスク（〜3時間）',
+}
+const SIZE_ORDER = ['big', 'mid', 'small', 'sub']
+// 1段小さい粒度を返す（入れ子で子タスクを作るときの既定）。親が未設定なら子も未設定。
+function nextSize(size) {
+  const i = SIZE_ORDER.indexOf(size)
+  if (i < 0) return null
+  return SIZE_ORDER[Math.min(i + 1, SIZE_ORDER.length - 1)]
 }
 
-function StatusPill({ status, onClick }) {
-  const v = STATUS_VISUAL[status] ?? STATUS_VISUAL.todo
+// 粒度バッジ（設定済みのときだけ表示）。
+export function SizeChip({ size }) {
+  const m = SIZE_META[size]
+  if (!m) return null
   return (
-    <button
-      onClick={onClick}
-      title="タップで状態を切替（未着手→進行中→完了）"
-      className={cn(
-        'flex w-[68px] shrink-0 items-center justify-center gap-1 rounded-full py-1 text-[11px] font-medium transition-colors',
-        v.cls,
-      )}
+    <span
+      className={cn('flex h-5 shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold leading-none', m.cls)}
+      title={SIZE_HINT[size]}
     >
-      {v.icon}
-      <span>{v.label}</span>
+      {m.label}
+    </span>
+  )
+}
+
+// タスクの状態＝丸アイコン1つ。タップで 未着手→進行中→完了 を巡回。
+// 未着手は中空の丸、進行中は青、完了は緑、待ちは琥珀。形は同じで色で状態を示す。
+function StatusCircle({ status, onClick }) {
+  const common = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white'
+  let inner
+  if (status === 'doing') inner = <span className={cn(common, 'bg-blue-500')}><Play className="h-2.5 w-2.5 fill-white" /></span>
+  else if (status === 'done') inner = <span className={cn(common, 'bg-emerald-500')}><Check className="h-3 w-3" strokeWidth={3} /></span>
+  else if (status === 'blocked') inner = <span className={cn(common, 'bg-amber-500')}><Pause className="h-2.5 w-2.5 fill-white" /></span>
+  else inner = <Circle className="h-5 w-5 shrink-0 text-zinc-300" />
+  return (
+    <button onClick={onClick} title="タップで状態を切替（未着手→進行中→完了）" className="shrink-0">
+      {inner}
     </button>
   )
+}
+
+// 期日（小さく右に）。今日以前で未完了なら赤＝「急ぎ」が一目で分かる。
+const TODAY = new Date().toISOString().slice(0, 10)
+export function DueDate({ date, done }) {
+  if (!date) return null
+  const urgent = !done && String(date).slice(0, 10) <= TODAY
+  return (
+    <span className={cn('shrink-0 text-xs tabular-nums', urgent ? 'font-medium text-red-500' : 'text-zinc-400')}>
+      {fmtMD(date)}
+    </span>
+  )
+}
+function fmtMD(d) {
+  const p = String(d).split('-')
+  return p.length < 3 ? d : `${Number(p[1])}/${Number(p[2])}`
 }
 
 // ゴール直下のタスク（サブタスク含む・サブゴールは含めない）の done/total を集計
@@ -369,18 +398,18 @@ function Avatar({ user, size = 'md', className = '' }) {
   )
 }
 
-// タスク左端の担当者表示：主担当を大きく、残りは小さく重ねてまとめる（多いと +N）。
+// タスク右端の担当者表示：主担当＋残りを小さく重ねてまとめる（多いと +N）。
 function AssigneeStack({ ids, users }) {
   const list = (ids ?? []).map((id) => users[id]).filter(Boolean)
   if (list.length === 0) {
-    return <span className="h-7 w-7 shrink-0 rounded-full border-2 border-dashed border-zinc-200" title="未割当" />
+    return <span className="h-5 w-5 shrink-0 rounded-full border border-dashed border-zinc-200" title="未割当" />
   }
   const [primary, ...rest] = list
   const shown = rest.slice(0, 2)
   const more = rest.length - shown.length
   return (
     <div className="flex shrink-0 items-center" title={list.map((u) => u.name).join('、')}>
-      <Avatar user={primary} size="lg" />
+      <Avatar user={primary} size="md" />
       {shown.map((u) => (
         <Avatar key={u.id} user={u} size="sm" className="-ml-1.5 ring-2 ring-white" />
       ))}

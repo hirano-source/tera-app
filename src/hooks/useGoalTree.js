@@ -55,13 +55,13 @@ export function useGoalTree() {
       else if (ta.goal_id) (topTasksByGoal[ta.goal_id] ??= []).push(ta)
     })
 
-    const buildTask = (ta, allowChildren) => ({
+    // タスクは粒度（大→中→小→サブ）に応じて何段でも入れ子にできる（段数制限なし）。
+    const buildTask = (ta) => ({
       ...ta,
       kind: 'task',
       commentCount: commentCount[`task:${ta.id}`] ?? 0,
       assigneeIds: orderAssignees(ta),
-      // 2段目まで＝サブタスクの下はぶら下げない（allowChildren=false）
-      children: allowChildren ? (subtasksByParent[ta.id] ?? []).map((st) => buildTask(st, false)) : [],
+      children: (subtasksByParent[ta.id] ?? []).map((st) => buildTask(st)),
     })
 
     const build = (parentId) =>
@@ -71,7 +71,7 @@ export function useGoalTree() {
         commentCount: commentCount[`goal:${go.id}`] ?? 0,
         children: [
           ...build(go.id),
-          ...(topTasksByGoal[go.id] ?? []).map((ta) => buildTask(ta, true)),
+          ...(topTasksByGoal[go.id] ?? []).map((ta) => buildTask(ta)),
         ],
       }))
 
@@ -105,8 +105,9 @@ export function useGoalTree() {
     await load()
   }
 
-  // ゴール配下にタスクを追加（parentTaskId 指定でサブタスク。goal_idは親と同じ）
-  const addTask = async (goalId, title, parentTaskId = null) => {
+  // ゴール配下にタスクを追加（parentTaskId 指定で入れ子。goal_idは親と同じ）。
+  // size=粒度（大/中/小/サブ）。入れ子で作るときは呼び出し側が「親より1段小さい」を渡す。
+  const addTask = async (goalId, title, parentTaskId = null, size = null) => {
     const text = title.trim()
     if (!text || !currentId) return
     await supabase.from('tasks').insert({
@@ -118,6 +119,7 @@ export function useGoalTree() {
       is_today: false,
       for_date: today(),
       source: 'goal',
+      size,
     })
     await load()
   }
