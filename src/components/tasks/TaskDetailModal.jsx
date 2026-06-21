@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Trash2 } from 'lucide-react'
+import { X, Trash2, Bot } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import CommentThread from '../comments/CommentThread'
@@ -72,7 +72,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
       const { data: mem } = await supabase.from('memberships').select('user_id').eq('workspace_id', currentId)
       const ids = (mem ?? []).map((m) => m.user_id)
       if (ids.length) {
-        const { data: us } = await supabase.from('users').select('id,name,avatar_color').in('id', ids)
+        const { data: us } = await supabase.from('users').select('id,name,avatar_color,is_bot').in('id', ids)
         if (active) setMembers(us ?? [])
       }
     })()
@@ -96,6 +96,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
       title: t.title,
       status: t.status,
       priority: t.priority || 'P2',
+      is_today: !!t.is_today,
       recurrence: t.recurrence || null,
       start_due_date: t.start_due_date || null,
       due_date: t.due_date || null,
@@ -181,6 +182,17 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
               <Select value={t.recurrence || ''} onChange={(v) => set('recurrence', v)} options={RECURRENCE} />
             </Field>
 
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={!!t.is_today}
+                onChange={(e) => set('is_today', e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              <span className="text-sm text-zinc-700">今日のToDoに表示する</span>
+              <span className="ml-auto text-xs text-zinc-400">オフ＝予定リストだけに置く</span>
+            </label>
+
             <Field label="担当（複数可）">
               <div className="flex flex-wrap gap-1.5">
                 {members.map((m) => {
@@ -199,7 +211,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
                         className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
                         style={{ backgroundColor: m.avatar_color || '#6d5dfc' }}
                       >
-                        {(m.name || '?').charAt(0).toUpperCase()}
+                        {m.is_bot ? <Bot className="h-2.5 w-2.5" /> : (m.name || '?').charAt(0).toUpperCase()}
                       </span>
                       {m.name}
                     </button>

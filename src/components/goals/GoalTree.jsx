@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronRight, Play, Check, Pause, Circle,
-  ListPlus, GitBranchPlus, Maximize2, Users, X, Trash2,
+  ListPlus, GitBranchPlus, Maximize2, Users, X, Trash2, Bot,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
@@ -360,13 +360,14 @@ function ProgressBadge({ value }) {
 
 function Avatar({ user, size = 'md', className = '' }) {
   const s = { sm: 'h-4 w-4 text-[9px]', md: 'h-5 w-5 text-[10px]', lg: 'h-7 w-7 text-[12px]' }[size]
+  const ic = { sm: 'h-2.5 w-2.5', md: 'h-3 w-3', lg: 'h-4 w-4' }[size]
   return (
     <span
       className={cn('flex shrink-0 items-center justify-center rounded-full font-bold text-white', s, className)}
       style={{ backgroundColor: user.avatar_color || '#6d5dfc' }}
-      title={user.name}
+      title={user.is_bot ? `${user.name}（AI）` : user.name}
     >
-      {(user.name || '?').charAt(0).toUpperCase()}
+      {user.is_bot ? <Bot className={ic} /> : (user.name || '?').charAt(0).toUpperCase()}
     </span>
   )
 }

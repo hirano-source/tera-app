@@ -196,7 +196,8 @@ async function buildManual(ctx: Ctx, visionGoal: { id: string; title: string } |
 // WS非依存の取扱説明（構造とルールの要点）。常時ルールの“控え”＝クライアントが instructions を無視しても効くように同梱。
 const MANUAL_STATIC = `【TERAの構造】事業 → 大目標（頂点）→ ゴール → タスク。タスクの粒度は「階層の深さ」で表す：大タスク(ゴール直下・目安3ヶ月)→ 中(目安1週間)→ 小(目安3日)→ サブ(目安3時間)。create_task の parentTaskId で1段下にぶら下げてブレイクダウンする。中/小/サブを単独では作らず、必ず上位タスクの子にする（必ず大タスクの下に連なる）。何段でも入れ子可。
 ゴールもタスクも「理想の状態 → 現状 → その差(gap) → やること(approach)」の型で考える。
-タスクの主なフィールド: completionCriteria(完了の基準) / approach(やること) / priority(P0今日中/P1今週/P2来週/P3〆切あり/P4いつか) / startDueDate(着手期限) / dueDate(完了期限) / recurrence(daily/weekly/monthly。突発・重点案件は省略) / assigneeId(担当) / goalId(紐づくゴール) / parentTaskId(上位タスク＝1段大きい粒度)。
+タスクの主なフィールド: completionCriteria(完了の基準) / approach(やること) / priority(P0今日中/P1今週/P2来週/P3〆切あり/P4いつか) / startDueDate(着手期限) / dueDate(完了期限) / recurrence(daily/weekly/monthly。突発・重点案件は省略) / assigneeId(担当) / goalId(紐づくゴール) / parentTaskId(上位タスク＝1段大きい粒度) / isToday(今日のToDoに出すか。既定false＝今日やるものだけtrue。むやみにtrueにして今日を溢れさせない)。
+担当は人だけでなくAIも割り当てられる（list_membersにある is_bot=true のメンバー＝AI担当）。「これはAIにやらせる」系のタスクはそのAIメンバーを assigneeId にする。
 詰まったら status=blocked にし blockerType(data/approval/reply/external)/blockerOwner(誰待ち)/blockerNote を入れる。
 
 【あなたの動き方（記録係で終わらない）】
@@ -357,7 +358,7 @@ export async function createTask(
     workspace_id: ctx.workspaceId,
     assignee_id: a.assigneeId ?? ctx.userId,
     title: requireTitle(a.title),
-    is_today: a.isToday ?? true,
+    is_today: a.isToday ?? false, // 既定は今日に出さない（今日やるものだけ isToday:true）
     for_date: today(),
     source: a.goalId ? 'goal' : 'manual',
   }
@@ -369,13 +370,14 @@ export async function createTask(
 
 export async function updateTask(
   ctx: Ctx,
-  a: { taskId: string; status?: string; title?: string } & TaskFields & {
+  a: { taskId: string; status?: string; title?: string; isToday?: boolean } & TaskFields & {
     blockerType?: string; blockerOwner?: string; blockerNote?: string
   },
 ) {
   const patch: Record<string, unknown> = {}
   if (a.status !== undefined) patch.status = a.status
   if (a.title !== undefined) patch.title = requireTitle(a.title)
+  if (a.isToday !== undefined) patch.is_today = a.isToday
   applyTaskFields(patch, a)
   if (a.blockerType !== undefined) patch.blocker_type = a.blockerType
   if (a.blockerOwner !== undefined) patch.blocker_owner = a.blockerOwner

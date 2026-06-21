@@ -114,7 +114,7 @@ export async function createGoal({ title, parentId = null }) {
   return data
 }
 
-export async function createTask({ title, assigneeId = null, isToday = true }) {
+export async function createTask({ title, assigneeId = null, isToday = false }) {
   const ctx = await init()
   const { data, error } = await supabase.from('tasks')
     .insert({ workspace_id: ctx.workspaceId, assignee_id: assigneeId ?? ctx.userId, title, is_today: isToday, for_date: today(), source: 'manual' })

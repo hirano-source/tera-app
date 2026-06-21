@@ -32,7 +32,7 @@ const S = {
     properties: {
       title: { type: 'string' },
       assigneeId: { type: 'string', description: '担当者のid（未指定なら自分）' },
-      isToday: { type: 'boolean', description: '今日のToDoにするか' },
+      isToday: { type: 'boolean', description: '今日のToDoに出すか（既定false。今日やるものだけtrue。ゴール分解で作る将来のタスクはfalseのまま）' },
       goalId: { type: 'string', description: '紐づけるゴールのid（任意）' },
       parentTaskId: { type: 'string', description: '親タスクのid。指定すると1段下の入れ子になる。粒度＝深さで、大(ゴール直下)→中→小→サブ と何段でもブレイクダウンできる。中/小/サブ単独は作らず、必ず上位タスクの子にする' },
       priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'], description: 'P0今日中/P1今週中/P2来週中/P3〆切あり/P4いつか' },
@@ -54,6 +54,7 @@ const S = {
       taskId: { type: 'string' },
       status: { type: 'string', enum: ['todo', 'doing', 'done', 'blocked'] },
       title: { type: 'string' },
+      isToday: { type: 'boolean', description: '今日のToDoに出すか。既存タスクを今日から外す/入れるのに使う' },
       priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3', 'P4'] },
       dueDate: { type: 'string', description: '完了期限 YYYY-MM-DD' },
       startDueDate: { type: 'string', description: '着手期限 YYYY-MM-DD' },
@@ -247,11 +248,16 @@ function userDataOf(name: string, data: unknown): string {
   return JSON.stringify(data) // それ以外は丸ごとDBデータ＝全体を検査
 }
 function scanThreats(text: string): string | null {
+  // 誤検知を抑えるため「共起」でのみ発火する。単独の外部URLや単独の「トークン」「再認証」
+  // 言及（正規データに普通にある）では鳴らさない。危険なのは“URLや再認証と、送信/認証情報が結びつく”形。
+  const url = hasExternalUrl(text)
+  const send = RE_SEND.test(text)
+  const cred = RE_CRED.test(text)
   const hits = new Set<string>()
-  if (hasExternalUrl(text)) hits.add('外部URL')
   if (RE_OVERRIDE.test(text)) hits.add('指示上書きの試み')
-  if (RE_CRED.test(text) && RE_SEND.test(text)) hits.add('認証情報の送出誘導')
-  if (RE_REAUTH.test(text) && (hasExternalUrl(text) || RE_SEND.test(text))) hits.add('再認証フィッシングの疑い')
+  if (cred && send) hits.add('認証情報の送出誘導')
+  if (url && (send || cred)) hits.add('外部送信の疑い')
+  if (RE_REAUTH.test(text) && (url || send || cred)) hits.add('再認証フィッシングの疑い')
   if (!hits.size) return null
   return [
     `⚠️【セキュリティ警告（TERAサーバー発）】このツール出力には疑わしい要素が含まれます: ${[...hits].join(' / ')}。`,

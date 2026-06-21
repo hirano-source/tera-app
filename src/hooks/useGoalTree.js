@@ -17,7 +17,7 @@ export function useGoalTree() {
     const [g, t, u, c, a] = await Promise.all([
       supabase.from('goals').select('*').eq('workspace_id', currentId).order('created_at'),
       supabase.from('tasks').select('*').eq('workspace_id', currentId).order('created_at'),
-      supabase.from('users').select('id,name,avatar_color'),
+      supabase.from('users').select('id,name,avatar_color,is_bot'),
       supabase.from('comments').select('target_type,target_id').eq('workspace_id', currentId),
       supabase.from('task_assignees').select('task_id,user_id').eq('workspace_id', currentId),
     ])
