@@ -25,47 +25,45 @@ export function useTeam() {
     setLoading(true)
     setError(null)
     try {
-      const [mem, users, goals, tasks, acts] = await withTimeout(
+      const [mem, users, tasks] = await withTimeout(
         Promise.all([
           supabase.from('memberships').select('role,user_id').eq('workspace_id', currentId),
           supabase.from('users').select('id,name,avatar_color'),
-          supabase.from('goals').select('owner_id,progress').eq('workspace_id', currentId),
-          supabase.from('tasks').select('assignee_id,status,title').eq('workspace_id', currentId),
           supabase
-            .from('activities')
-            .select('actor_id,summary,ts')
+            .from('tasks')
+            .select('assignee_id,status,title,created_at,updated_at')
             .eq('workspace_id', currentId)
-            .order('ts', { ascending: false }),
+            .order('updated_at', { ascending: false }),
         ]),
         12000,
         'team fetch',
       )
 
+      // 進捗・直近の動きは「保存値や活動ログ」ではなく、生きてるタスクから都度導出する（陳腐化しない）。
       const userMap = new Map((users.data ?? []).map((u) => [u.id, u]))
-      const goalRows = goals.data ?? []
       const taskRows = tasks.data ?? []
-      const actRows = acts.data ?? []
+      const verb = (t) =>
+        t.status === 'done' ? '完了' : t.status === 'blocked' ? '待ち' : new Date(t.updated_at) - new Date(t.created_at) < 1000 ? '追加' : '更新'
 
       const list = (mem.data ?? []).map((m) => {
         const u = userMap.get(m.user_id) ?? { id: m.user_id, name: '（不明）' }
-        const myGoals = goalRows.filter((g) => g.owner_id === u.id)
-        const myTasks = taskRows.filter((t) => t.assignee_id === u.id)
-        const progress = myGoals.length
-          ? Math.round(myGoals.reduce((s, g) => s + (g.progress || 0), 0) / myGoals.length)
-          : 0
+        const myTasks = taskRows.filter((t) => t.assignee_id === u.id) // updated_at 降順
+        const done = myTasks.filter((t) => t.status === 'done').length
+        const total = myTasks.length
         const doing = myTasks.find((t) => t.status === 'doing')
         const todo = myTasks.find((t) => t.status === 'todo')
+        const recent = myTasks[0]
         return {
           id: u.id,
           name: u.name,
           color: u.avatar_color || '#6d5dfc',
           role: m.role,
-          progress,
+          progress: total ? Math.round((done / total) * 100) : 0,
           current: (doing || todo)?.title ?? null,
           blocked: myTasks.filter((t) => t.status === 'blocked').map((b) => b.title),
-          done: myTasks.filter((t) => t.status === 'done').length,
-          total: myTasks.length,
-          lastActivity: actRows.find((a) => a.actor_id === u.id)?.summary ?? null,
+          done,
+          total,
+          lastActivity: recent ? `「${recent.title}」を${verb(recent)}` : null,
         }
       })
       setMembers(list)
@@ -95,12 +93,6 @@ export function useTeam() {
       is_today: true,
       for_date: today(),
       source: 'manual',
-    })
-    await supabase.from('activities').insert({
-      workspace_id: currentId,
-      actor_id: user?.id ?? null,
-      type: 'task_assigned',
-      summary: `タスクを割り当て: ${text}`,
     })
     // 割り当てられた本人へ通知（自分自身への割当は通知しない）
     if (memberId !== user?.id) {

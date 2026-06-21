@@ -167,20 +167,14 @@ const TOOLS: Record<string, Tool> = {
     description: 'メンバーにタスクを割り当てる（相手の今日のToDoになる）。list_membersのidを使う。',
     inputSchema: S.assign,
     run: async (ctx, a) => {
-      const task = await supa.createTask(ctx, { title: a.title, assigneeId: a.assigneeId, isToday: true })
-      await supa.logActivity(ctx, { type: 'task_assigned', summary: `タスクを割り当て: ${a.title}` })
-      return task
+      // 割当＝実体(タスク)を作るだけ。直近の動きは getActivityLog が実体から導出するのでログは撒かない。
+      return await supa.createTask(ctx, { title: a.title, assigneeId: a.assigneeId, isToday: true })
     },
   },
   update_task: {
     description: 'タスクを更新する。状態(todo/doing/done/blocked)・タイトルのほか、priority/完了基準/やり方/期限/recurrence、詰まり時は blockerType/blockerOwner/blockerNote も指定できる。',
     inputSchema: S.update,
     run: (ctx, a) => supa.updateTask(ctx, a),
-  },
-  log_activity: {
-    description: '活動記録を残す（後で文脈として読み戻せる）。',
-    inputSchema: S.log,
-    run: (ctx, a) => supa.logActivity(ctx, a),
   },
   delete_task: {
     description: 'タスクを削除する（owner/admin、または自分が担当のタスク。権限が無ければ何も起きない）。完了にするだけなら update_task の status=done を使う。',
