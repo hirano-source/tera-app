@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useLayoutEffect } from 'react'
 import { X, Trash2, Bot } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -33,7 +33,7 @@ const BLOCKER = [
   { v: 'reply', label: '返信待ち' },
   { v: 'external', label: '外部待ち' },
 ]
-const taCls = 'w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500'
+const taCls = 'block w-full resize-none overflow-hidden rounded-lg border border-zinc-300 px-3 py-2 text-sm leading-relaxed outline-none focus:border-zinc-500'
 const dateCls = 'w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-zinc-500'
 
 export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
@@ -151,7 +151,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onClick={onClose}>
       <div
-        className="flex h-full w-full max-w-md flex-col bg-white shadow-xl"
+        className="flex h-full w-full max-w-lg flex-col bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
@@ -235,23 +235,23 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
 
             {/* やること・完了基準＝主役。スクロールせず見える位置に。 */}
             <Field label="やること">
-              <textarea rows={2} value={t.approach || ''} onChange={(e) => set('approach', e.target.value)} placeholder="差を埋める具体的な一手" className={taCls} />
+              <AutoTextarea value={t.approach || ''} onChange={(e) => set('approach', e.target.value)} placeholder="差を埋める具体的な一手" className={taCls} />
             </Field>
             <Field label="完了の基準（できた／できてないの判断）">
-              <textarea rows={2} value={t.completion_criteria || ''} onChange={(e) => set('completion_criteria', e.target.value)} placeholder="何ができたら完了と言えるか" className={taCls} />
+              <AutoTextarea value={t.completion_criteria || ''} onChange={(e) => set('completion_criteria', e.target.value)} placeholder="何ができたら完了と言えるか" className={taCls} />
             </Field>
 
             {/* 深掘り（理想→現状→差）：中身がある／開いたときだけ表示＝ふだんは短く */}
             {showDeep || t.ideal_state || t.current_state || t.gap ? (
               <div className="space-y-3">
                 <Field label="理想の状態">
-                  <textarea rows={2} value={t.ideal_state || ''} onChange={(e) => set('ideal_state', e.target.value)} placeholder="終わったらどうなってるか" className={taCls} />
+                  <AutoTextarea value={t.ideal_state || ''} onChange={(e) => set('ideal_state', e.target.value)} placeholder="終わったらどうなってるか" className={taCls} />
                 </Field>
                 <Field label="現状">
-                  <textarea rows={2} value={t.current_state || ''} onChange={(e) => set('current_state', e.target.value)} placeholder="今どうなってるか" className={taCls} />
+                  <AutoTextarea value={t.current_state || ''} onChange={(e) => set('current_state', e.target.value)} placeholder="今どうなってるか" className={taCls} />
                 </Field>
                 <Field label="その差">
-                  <textarea rows={2} value={t.gap || ''} onChange={(e) => set('gap', e.target.value)} placeholder="理想と現状のギャップ・詰まり" className={taCls} />
+                  <AutoTextarea value={t.gap || ''} onChange={(e) => set('gap', e.target.value)} placeholder="理想と現状のギャップ・詰まり" className={taCls} />
                 </Field>
               </div>
             ) : (
@@ -279,11 +279,10 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
                   />
                 </Field>
                 <Field label="メモ">
-                  <textarea
-                    rows={2}
+                  <AutoTextarea
                     value={t.blocker_note || ''}
                     onChange={(e) => set('blocker_note', e.target.value)}
-                    className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                    className={taCls}
                   />
                 </Field>
               </div>
@@ -321,6 +320,30 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
         </div>
       </div>
     </div>
+  )
+}
+
+// 中身の量に合わせて高さが自動で伸びる入力欄。
+// 枠内スクロールをなくし、書いた内容がそのまま全部見えるようにする。
+function AutoTextarea({ value, minRows = 2, className, ...props }) {
+  const ref = useRef(null)
+  const fit = () => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+  // 中身が変わるたび／開いた直後に高さを合わせ直す
+  useLayoutEffect(fit, [value])
+  return (
+    <textarea
+      ref={ref}
+      rows={minRows}
+      value={value}
+      onInput={fit}
+      className={className}
+      {...props}
+    />
   )
 }
 
