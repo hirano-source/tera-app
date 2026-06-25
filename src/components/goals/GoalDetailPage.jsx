@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -224,28 +224,28 @@ export default function GoalDetailPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <InfoField label="理想の状態">
                 {canEdit ? (
-                  <textarea rows={2} value={info.ideal_state} onChange={(e) => setInfo((p) => ({ ...p, ideal_state: e.target.value }))} placeholder="達成したらどうなっているか" className={inputCls} />
+                  <AutoTextarea value={info.ideal_state} onChange={(e) => setInfo((p) => ({ ...p, ideal_state: e.target.value }))} placeholder="達成したらどうなっているか" className={taCls} />
                 ) : (
                   <ReadVal v={goal.ideal_state} />
                 )}
               </InfoField>
               <InfoField label="現状">
                 {canEdit ? (
-                  <textarea rows={2} value={info.current} onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))} placeholder="今どういう状態か" className={inputCls} />
+                  <AutoTextarea value={info.current} onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))} placeholder="今どういう状態か" className={taCls} />
                 ) : (
                   <ReadVal v={goal.current} />
                 )}
               </InfoField>
               <InfoField label="その差">
                 {canEdit ? (
-                  <textarea rows={2} value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ・足りないもの" className={inputCls} />
+                  <AutoTextarea value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ・足りないもの" className={taCls} />
                 ) : (
                   <ReadVal v={goal.gap} />
                 )}
               </InfoField>
               <InfoField label="完了の基準">
                 {canEdit ? (
-                  <textarea rows={2} value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か" className={inputCls} />
+                  <AutoTextarea value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か" className={taCls} />
                 ) : (
                   <ReadVal v={goal.criteria} />
                 )}
@@ -488,6 +488,22 @@ export default function GoalDetailPage() {
 
 const inputCls =
   'w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500'
+// textarea用：枠内スクロールを無くし、中身に合わせて高さが伸びる
+const taCls =
+  'block w-full resize-none overflow-hidden rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm leading-relaxed outline-none focus:border-zinc-500'
+
+// 中身の量に合わせて高さが自動で伸びる入力欄（枠内スクロールをなくす）
+function AutoTextarea({ value, minRows = 2, className, ...props }) {
+  const ref = useRef(null)
+  const fit = () => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+  useLayoutEffect(fit, [value])
+  return <textarea ref={ref} rows={minRows} value={value} onInput={fit} className={className} {...props} />
+}
 
 function InfoField({ label, children }) {
   return (
