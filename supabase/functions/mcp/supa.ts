@@ -321,6 +321,7 @@ export async function updateGoal(
     dueDate?: string | null
     ownerId?: string | null
     progress?: number
+    parentId?: string | null
   },
 ) {
   const patch: Record<string, unknown> = {}
@@ -332,6 +333,8 @@ export async function updateGoal(
   if (a.dueDate !== undefined) patch.due_date = a.dueDate
   if (a.ownerId !== undefined) patch.owner_id = a.ownerId
   if (a.progress !== undefined) patch.progress = a.progress
+  // parentId で別の大目標／ゴールの下へ付け替え（移動）。null で最上位へ。
+  if (a.parentId !== undefined) patch.parent_id = a.parentId
   const { data, error } = await ctx.db.from('goals').update(patch).eq('id', a.goalId).select().maybeSingle()
   if (error) throw new Error(error.message)
   return data
