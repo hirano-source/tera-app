@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useLayoutEffect } from 'react'
-import { X, Trash2, Bot } from 'lucide-react'
+import { X, Trash2, Bot, CornerUpRight } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import CommentThread from '../comments/CommentThread'
+import MovePickerModal from '../common/MovePickerModal'
 import { cn } from '../../utils/cn'
 
 // タスクの詳細（右からのドロワー）。クリックで開き、6項目を表示／編集する。
@@ -46,6 +47,7 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
   const [members, setMembers] = useState([])
   const [assignees, setAssignees] = useState([]) // 担当（複数）user_id配列
   const [showDeep, setShowDeep] = useState(false) // 理想/現状/差（深掘り）の表示
+  const [showMove, setShowMove] = useState(false) // 移動先ピッカー
 
   useEffect(() => {
     if (!open || !taskId) return
@@ -311,6 +313,15 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
             </button>
           )}
           <button
+            onClick={() => setShowMove(true)}
+            disabled={busy || !t}
+            title="別のゴール／タスクの下へ移動"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
+          >
+            <CornerUpRight className="h-4 w-4" />
+            移動
+          </button>
+          <button
             onClick={save}
             disabled={busy || !t}
             className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
@@ -319,6 +330,18 @@ export default function TaskDetailModal({ taskId, open, onClose, onSaved }) {
           </button>
         </div>
       </div>
+
+      {t && (
+        <MovePickerModal
+          open={showMove}
+          onClose={() => setShowMove(false)}
+          item={{ kind: 'task', id: t.id, title: t.title, goal_id: t.goal_id, parent_task_id: t.parent_task_id }}
+          onMoved={() => {
+            onSaved?.()
+            onClose()
+          }}
+        />
+      )}
     </div>
   )
 }

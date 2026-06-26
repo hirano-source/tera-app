@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronRight, Play, Check, Pause, Circle,
-  ListPlus, GitBranchPlus, Maximize2, Users, X, Trash2, Bot,
+  ListPlus, GitBranchPlus, Maximize2, Users, X, Trash2, Bot, CornerUpRight,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { GOAL_MAX } from '../../utils/limits'
@@ -12,7 +12,7 @@ import { GOAL_MAX } from '../../utils/limits'
 // 優先度＝左の色帯（赤P0/橙P1）、担当＝小さめアイコン、日付＝小さく右。
 // 操作アイコンはホバー時のみ（スマホは行タップで詳細を開く）。
 // canEditGoals=false（メンバー）はゴールの追加・担当割当を出さない（タスクは全員可）。
-export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals = true }) {
+export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, onMove, canEditGoals = true }) {
   return (
     <div>
       {tree.map((node) => (
@@ -27,6 +27,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
           onAssignOwner={onAssignOwner}
           onOpenTask={onOpenTask}
           onDeleteGoal={onDeleteGoal}
+          onMove={onMove}
           canEditGoals={canEditGoals}
         />
       ))}
@@ -34,7 +35,7 @@ export default function GoalTree({ tree, users, onToggleTask, onAddTask, onAddGo
   )
 }
 
-function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, canEditGoals }) {
+function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAddGoal, onAssignOwner, onOpenTask, onDeleteGoal, onMove, canEditGoals }) {
   const navigate = useNavigate()
   const isGoal = node.kind === 'goal'
   const children = node.children ?? []
@@ -161,6 +162,11 @@ function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAd
             <ToolButton title="詳細を開く" onClick={() => navigate(`/goals/${node.id}`)}>
               <Maximize2 className="h-4 w-4" />
             </ToolButton>
+            {canEditGoals && onMove && (
+              <ToolButton title="このゴールを移動" onClick={() => onMove(node)}>
+                <CornerUpRight className="h-4 w-4" />
+              </ToolButton>
+            )}
             {canEditGoals && onDeleteGoal && (
               <ToolButton
                 title="ゴールを削除"
@@ -181,6 +187,11 @@ function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAd
             <ToolButton title="1段小さいタスクを追加（ブレイクダウン）" onClick={() => startAdd('task')}>
               <ListPlus className="h-4 w-4" />
             </ToolButton>
+            {onMove && (
+              <ToolButton title="このタスクを移動" onClick={() => onMove(node)}>
+                <CornerUpRight className="h-4 w-4" />
+              </ToolButton>
+            )}
           </div>
         )}
       </div>
@@ -211,6 +222,7 @@ function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAd
                   onAssignOwner={onAssignOwner}
                   onOpenTask={onOpenTask}
                   onDeleteGoal={onDeleteGoal}
+                  onMove={onMove}
                   canEditGoals={canEditGoals}
                 />
               </div>

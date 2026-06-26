@@ -7,6 +7,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import GoalTree, { PRIORITY_ACCENT, DueDate } from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
 import TaskDetailModal from '../tasks/TaskDetailModal'
+import MovePickerModal from '../common/MovePickerModal'
 import { GOAL_MAX } from '../../utils/limits'
 
 // 今日のToDo 画面 (/todo)。
@@ -29,6 +30,7 @@ export default function TodayTodoPage() {
   const [goalText, setGoalText] = useState('')
   const [addingGoalFor, setAddingGoalFor] = useState(null) // 入力中の大目標id
   const [openTaskId, setOpenTaskId] = useState(null)
+  const [moveItem, setMoveItem] = useState(null) // 移動中のゴール/タスク
   const navigate = useNavigate()
 
   // 大目標（is_vision）は複数。絶対目標なのでツリーには入れず別格の見出しにし、
@@ -168,6 +170,7 @@ export default function TodayTodoPage() {
               onAssignOwner={assignOwner}
               onOpenTask={(node) => setOpenTaskId(node.id)}
               onDeleteGoal={deleteGoal}
+              onMove={setMoveItem}
               canEditGoals={canEditGoals}
             />
 
@@ -218,6 +221,7 @@ export default function TodayTodoPage() {
             onAssignOwner={assignOwner}
             onOpenTask={(node) => setOpenTaskId(node.id)}
             onDeleteGoal={deleteGoal}
+            onMove={setMoveItem}
             canEditGoals={canEditGoals}
           />
         </section>
@@ -230,6 +234,16 @@ export default function TodayTodoPage() {
         onSaved={() => {
           reloadTodos()
           reloadTree()
+        }}
+      />
+
+      <MovePickerModal
+        open={!!moveItem}
+        item={moveItem}
+        onClose={() => setMoveItem(null)}
+        onMoved={() => {
+          reloadTree()
+          reloadTodos()
         }}
       />
     </div>

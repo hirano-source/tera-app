@@ -15,6 +15,7 @@ import {
   Play,
   Link2,
   ExternalLink,
+  CornerUpRight,
 } from 'lucide-react'
 import { useGoal } from '../../hooks/useGoals'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -23,6 +24,7 @@ import { useGoalTasks } from '../../hooks/useGoalTasks'
 import { supabase } from '../../utils/supabaseClient'
 import { cn } from '../../utils/cn'
 import { GOAL_MAX } from '../../utils/limits'
+import MovePickerModal from '../common/MovePickerModal'
 import CommentThread from '../comments/CommentThread'
 import TaskDetailModal from '../tasks/TaskDetailModal'
 import TaskMeta from '../tasks/TaskMeta'
@@ -32,7 +34,7 @@ import TaskMeta from '../tasks/TaskMeta'
 export default function GoalDetailPage() {
   const { goalId } = useParams()
   const navigate = useNavigate()
-  const { goal, loading, saveGoal, deleteGoal } = useGoal(goalId)
+  const { goal, loading, saveGoal, deleteGoal, reload: reloadGoal } = useGoal(goalId)
   const { current, currentId, user } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
   // 大目標（is_vision）かどうか。大目標の名前は事業設定からのみ変更できる。
@@ -55,6 +57,8 @@ export default function GoalDetailPage() {
   const [members, setMembers] = useState([])
   const [savingInfo, setSavingInfo] = useState(false)
   const [crumbs, setCrumbs] = useState([])
+  const [showMove, setShowMove] = useState(false)
+  const [crumbBump, setCrumbBump] = useState(0) // 移動後にパンくずを引き直す
 
   useEffect(() => {
     if (!goal) return
@@ -99,7 +103,7 @@ export default function GoalDetailPage() {
     return () => {
       active = false
     }
-  }, [currentId, goalId])
+  }, [currentId, goalId, crumbBump])
 
   const infoDirty =
     !!goal &&
@@ -461,9 +465,16 @@ export default function GoalDetailPage() {
             </div>
           </section>
 
-          {/* ゴール削除（owner/admin） */}
-          {canEdit && (
-            <div className="mt-6 border-t border-zinc-100 pt-4">
+          {/* ゴールの移動・削除（owner/admin）。大目標は事業設定でのみ扱うので出さない。 */}
+          {canEdit && !isVisionGoal && (
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
+              <button
+                onClick={() => setShowMove(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                <CornerUpRight className="h-4 w-4" />
+                このゴールを移動
+              </button>
               <button
                 onClick={removeGoal}
                 className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50"
@@ -491,6 +502,18 @@ export default function GoalDetailPage() {
         onClose={() => setOpenTaskId(null)}
         onSaved={reloadTasks}
       />
+
+      {goal && !isVisionGoal && (
+        <MovePickerModal
+          open={showMove}
+          onClose={() => setShowMove(false)}
+          item={{ kind: 'goal', id: goal.id, title: goal.title, parent_id: goal.parent_id }}
+          onMoved={() => {
+            reloadGoal()
+            setCrumbBump((b) => b + 1)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../utils/supabaseClient'
 import { useWorkspace } from './useWorkspace'
 import { GOAL_MAX, clamp } from '../utils/limits'
@@ -57,9 +57,16 @@ export function useGoal(goalId) {
   const [goal, setGoal] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (!goalId || !currentId) return
+    const { data } = await supabase.from('goals').select('*').eq('id', goalId).maybeSingle()
+    setGoal(data)
+    setLoading(false)
+  }, [goalId, currentId])
+
+  useEffect(() => {
     let active = true
+    if (!goalId || !currentId) return
     supabase
       .from('goals')
       .select('*')
@@ -97,5 +104,5 @@ export function useGoal(goalId) {
     if (error) throw error
   }
 
-  return { goal, loading, saveGoal, deleteGoal }
+  return { goal, loading, saveGoal, deleteGoal, reload }
 }
