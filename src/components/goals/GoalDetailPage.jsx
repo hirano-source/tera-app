@@ -24,7 +24,9 @@ import { useGoalTasks } from '../../hooks/useGoalTasks'
 import { supabase } from '../../utils/supabaseClient'
 import { cn } from '../../utils/cn'
 import { GOAL_MAX } from '../../utils/limits'
+import { derivePhase } from '../../utils/goalView'
 import MovePickerModal from '../common/MovePickerModal'
+import VisionDashboard from './VisionDashboard'
 import CommentThread from '../comments/CommentThread'
 import TaskDetailModal from '../tasks/TaskDetailModal'
 import TaskMeta from '../tasks/TaskMeta'
@@ -155,9 +157,29 @@ export default function GoalDetailPage() {
   }, [items, q, asc])
 
   const doneCount = tasks.filter((t) => t.status === 'done').length
+  // 状態順（詰まり→進行中→未着手→完了）に並べ替えて表示する
+  const sortedTasks = [...tasks].sort((a, b) => (TASK_ORDER[a.status] ?? 2) - (TASK_ORDER[b.status] ?? 2))
+  // レーン：手動 phase を優先、無ければ自動判定
+  const currentPhase = goal?.phase || (goal ? derivePhase(goal, tasks) : 'now')
+  const setPhase = async (p) => {
+    try {
+      await saveGoal({ phase: p })
+    } catch (e) {
+      alert('保存に失敗しました: ' + (e?.message ?? e))
+    }
+  }
 
   if (loading || !goal) {
     return <div className="flex h-full items-center justify-center text-zinc-400">読み込み中…</div>
+  }
+
+  // 大目標を開いたときは「把握する画面」＝ダッシュボードに切り替える。
+  if (isVisionGoal) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VisionDashboard goalId={goalId} />
+      </div>
+    )
   }
 
   const onPick = (e) => {
@@ -215,6 +237,31 @@ export default function GoalDetailPage() {
             <h1 className="text-2xl font-bold tracking-wide sm:text-3xl">{goal.title}</h1>
           </div>
 
+          {/* レーン（今ここ / 次 / あとで）。未設定は自動判定の値を初期表示。 */}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-xs text-zinc-500">レーン</span>
+            <div className="flex gap-1">
+              {PHASE_OPTS.map((o) => {
+                const on = currentPhase === o.v
+                return (
+                  <button
+                    key={o.v}
+                    onClick={() => canEdit && setPhase(o.v)}
+                    disabled={!canEdit}
+                    className={cn(
+                      'flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',
+                      on ? 'border-terracotta bg-terracotta/10 text-terracotta' : 'border-zinc-300 text-zinc-500 hover:bg-zinc-50',
+                      !canEdit && 'cursor-default',
+                    )}
+                  >
+                    <span className={cn('h-2 w-2 rounded-full', o.dot)} /> {o.label}
+                  </button>
+                )
+              })}
+            </div>
+            {!goal.phase && <span className="text-[11px] text-zinc-400">（自動判定）</span>}
+          </div>
+
           {/* ゴール情報 */}
           <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
             <InfoField label={isVisionGoal ? '大目標名' : 'ゴール名'}>
@@ -234,36 +281,50 @@ export default function GoalDetailPage() {
                 </>
               )}
             </InfoField>
+            {/* 理想 → 現状 → その差 の流れ。「差＝埋めるところ」を一番目立たせる。 */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <InfoField label="理想の状態">
+              <InfoField label="◎ 理想の状態">
                 {canEdit ? (
                   <AutoTextarea value={info.ideal_state} onChange={(e) => setInfo((p) => ({ ...p, ideal_state: e.target.value }))} placeholder="達成したらどうなっているか" className={taCls} />
                 ) : (
                   <ReadVal v={goal.ideal_state} />
                 )}
               </InfoField>
-              <InfoField label="現状">
+              <InfoField label="● 現状">
                 {canEdit ? (
                   <AutoTextarea value={info.current} onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))} placeholder="今どういう状態か" className={taCls} />
                 ) : (
                   <ReadVal v={goal.current} />
                 )}
               </InfoField>
-              <InfoField label="その差">
-                {canEdit ? (
-                  <AutoTextarea value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ・足りないもの" className={taCls} />
-                ) : (
-                  <ReadVal v={goal.gap} />
-                )}
-              </InfoField>
-              <InfoField label="完了の基準">
-                {canEdit ? (
-                  <AutoTextarea value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か" className={taCls} />
-                ) : (
-                  <ReadVal v={goal.criteria} />
-                )}
-              </InfoField>
             </div>
+
+            {/* その差（埋めるところ）＝枠＋テラコッタで強調 */}
+            <div className="rounded-xl border border-terracotta/40 bg-terracotta/5 p-3">
+              <span className="mb-1 block text-xs font-semibold text-terracotta">その差（埋めるところ）</span>
+              {canEdit ? (
+                <AutoTextarea value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ・足りないもの＝ここを埋める" className={taCls} />
+              ) : (
+                <ReadVal v={goal.gap} />
+              )}
+            </div>
+
+            <InfoField label="✓ 完了の基準">
+              {canEdit ? (
+                <AutoTextarea value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か（1行＝1チェックの体裁で書くと分かりやすい）" className={taCls} />
+              ) : goal.criteria ? (
+                <ul className="space-y-1">
+                  {String(goal.criteria).split(/\n|。/).map((s) => s.trim()).filter(Boolean).map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-zinc-300 text-zinc-300">☐</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <ReadVal v={null} />
+              )}
+            </InfoField>
             <div className="grid gap-4 sm:grid-cols-2">
               <InfoField label="期日">
                 {canEdit ? (
@@ -305,22 +366,33 @@ export default function GoalDetailPage() {
               )}
             </h2>
             <ul className="mt-3 space-y-1">
-              {tasks.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50">
+              {sortedTasks.map((t) => (
+                <li
+                  key={t.id}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50',
+                    t.status === 'blocked' && 'border border-lantern/30 bg-lantern/5',
+                  )}
+                >
                   <button
                     onClick={() => toggleTask(t)}
                     className={cn(
                       'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
-                      t.status === 'done' ? 'bg-emerald-500 text-white' : 'bg-brand text-white',
+                      t.status === 'done' ? 'bg-emerald-500 text-white' : t.status === 'blocked' ? 'bg-lantern text-white' : 'bg-brand text-white',
                     )}
                   >
                     {t.status === 'done' ? <Check className="h-3 w-3" strokeWidth={3} /> : <Play className="h-2.5 w-2.5 translate-x-0.5 fill-white" />}
                   </button>
                   <button
                     onClick={() => setOpenTaskId(t.id)}
-                    className={cn('min-w-0 flex-1 truncate text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
+                    className={cn('min-w-0 flex-1 text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
                   >
-                    {t.title}
+                    <span className="block truncate">{t.title}</span>
+                    {t.status === 'blocked' && (t.blocker_type || t.blocker_owner) && (
+                      <span className="mt-0.5 block truncate text-[11px] font-medium text-lantern">
+                        詰まり: {[BLOCKER_JP[t.blocker_type], t.blocker_owner && `${t.blocker_owner}待ち`].filter(Boolean).join('・')}
+                      </span>
+                    )}
                   </button>
                   <TaskMeta task={t} />
                   <button onClick={() => setOpenTaskId(t.id)} title="詳細" className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
@@ -517,6 +589,15 @@ export default function GoalDetailPage() {
     </div>
   )
 }
+
+// タスクの並び順：詰まり(最上部・赤) → 進行中 → 未着手 → 完了
+const TASK_ORDER = { blocked: 0, doing: 1, todo: 2, done: 3 }
+const BLOCKER_JP = { data: 'データ待ち', approval: '承認待ち', reply: '返信待ち', external: '外部待ち' }
+const PHASE_OPTS = [
+  { v: 'now', label: '今ここ', dot: 'bg-lantern' },
+  { v: 'next', label: '次', dot: 'bg-amber-400' },
+  { v: 'later', label: 'あとで', dot: 'bg-zinc-300' },
+]
 
 const inputCls =
   'w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500'

@@ -8,6 +8,14 @@ export default {
         topbar: '#1c1c1e',
         claude: '#6d5dfc',
         brand: '#2563eb',
+        // ゴルおじ酒場の世界観（昭和の大衆酒場・赤提灯）。大目標サーフェスで使う。
+        cream: '#F3EEE3',
+        ink: '#1A1714',
+        sumi: '#6B635B',
+        terracotta: '#C04A2B',
+        lantern: '#CC2A2A',
+        matcha: '#5E8C61',
+        hairline: '#E4DCCC',
       },
       fontFamily: {
         sans: [

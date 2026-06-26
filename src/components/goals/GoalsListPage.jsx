@@ -55,7 +55,7 @@ export default function GoalsListPage() {
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
             <Play className="h-4 w-4 translate-x-0.5 fill-brand" />
           </span>
-          <span className="flex-1 truncate text-zinc-700">{g.title}</span>
+          <span className="line-clamp-2 flex-1 text-zinc-700">{g.title}</span>
           {g.progress > 0 && <span className="shrink-0 text-xs text-zinc-400">{g.progress}%</span>}
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
         </button>
@@ -82,7 +82,7 @@ export default function GoalsListPage() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">事業の大目標</div>
-              <div className="mt-0.5 truncate text-xl font-bold text-zinc-900">{v.title}</div>
+              <div className="mt-0.5 line-clamp-2 text-xl font-bold text-zinc-900">{v.title}</div>
             </div>
             <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-amber-300 group-hover:text-amber-500" />
           </div>

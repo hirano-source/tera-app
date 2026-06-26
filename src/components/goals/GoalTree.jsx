@@ -94,7 +94,12 @@ function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAd
               className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
             >
               <ProgressBadge value={goalPct} />
-              <span className="min-w-0 flex-1 truncate text-[17px] font-semibold text-zinc-900">{node.title}</span>
+              <span className="min-w-0 flex-1 line-clamp-2 text-[17px] font-semibold text-zinc-900">{node.title}</span>
+              {node.phase === 'now' && (
+                <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-lantern/10 px-1.5 py-0.5 text-[10px] font-bold text-lantern">
+                  <span className="h-1.5 w-1.5 rounded-full bg-lantern" />今
+                </span>
+              )}
             </button>
             {taskCount.total > 0 && (
               <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">
@@ -113,7 +118,7 @@ function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAd
             <button onClick={() => onOpenTask?.(node)} className="min-w-0 flex-1 text-left">
               <span
                 className={cn(
-                  'block truncate',
+                  'block line-clamp-2',
                   node.status === 'done' ? 'text-zinc-400 line-through' : TITLE_BY_DEPTH[Math.min(taskDepth, 3)],
                 )}
               >

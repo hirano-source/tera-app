@@ -147,6 +147,15 @@ export default function TodayTodoPage() {
         )}
       </section>
 
+      {/* 優先度の色の意味（左の色帯が何を表すか） */}
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-400">
+        <span className="font-medium text-zinc-500">優先度</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-1 rounded-full bg-red-500" />P0 今日</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-1 rounded-full bg-amber-400" />P1 今週</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-1 rounded-full bg-zinc-300" />P2以降</span>
+        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-lantern" />今＝いま動かすゴール</span>
+      </div>
+
       {/* === 大目標ごと（絶対目標は別格の見出し。配下だけツリーで編集できる） === */}
       {visionNodes.map((vision) => (
         <section key={vision.id} className="mt-10">
