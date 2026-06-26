@@ -7,6 +7,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import GoalTree, { PRIORITY_ACCENT, DueDate } from '../goals/GoalTree'
 import MicButton from '../common/MicButton'
 import TaskDetailModal from '../tasks/TaskDetailModal'
+import { GOAL_MAX } from '../../utils/limits'
 
 // 今日のToDo 画面 (/todo)。
 export default function TodayTodoPage() {
@@ -26,16 +27,16 @@ export default function TodayTodoPage() {
   const [addingTask, setAddingTask] = useState(false)
   const [taskText, setTaskText] = useState('')
   const [goalText, setGoalText] = useState('')
+  const [addingGoalFor, setAddingGoalFor] = useState(null) // 入力中の大目標id
   const [openTaskId, setOpenTaskId] = useState(null)
   const navigate = useNavigate()
 
-  // 大目標は「絶対目標」なのでツリーに入れず別格表示にする。
-  // ツリーには大目標の配下（子ゴール／タスク）だけを渡す。
-  const visionGoalId = current?.visionGoalId ?? null
-  const visionNode = tree.find((n) => n.id === visionGoalId) ?? null
-  const displayTree = visionGoalId
-    ? tree.flatMap((n) => (n.id === visionGoalId ? n.children : [n]))
-    : tree
+  // 大目標（is_vision）は複数。絶対目標なのでツリーには入れず別格の見出しにし、
+  // その配下（子ゴール／タスク）だけをツリーに渡す。大目標の追加/削除は事業設定だけ。
+  const isVision = (n) => n.kind === 'goal' && (n.is_vision || n.id === current?.visionGoalId)
+  const visionNodes = tree.filter(isVision)
+  // どの大目標にも属さない最上位ノード（旧データの受け皿）
+  const orphanNodes = tree.filter((n) => !isVision(n))
 
   // 上の「今日のToDo」と下のツリーは同じタスクを別フックで保持している。
   // 片方を操作したら、もう片方も再取得して整合を取る（完了切替・削除が両方に反映される）。
@@ -57,9 +58,10 @@ export default function TodayTodoPage() {
     setTaskText('')
     setAddingTask(false)
   }
-  const submitGoal = async () => {
-    await createGoal(goalText)
+  const submitGoal = async (visionId) => {
+    await createGoal(goalText, visionId)
     setGoalText('')
+    setAddingGoalFor(null)
   }
 
   return (
@@ -143,57 +145,83 @@ export default function TodayTodoPage() {
         )}
       </section>
 
-      {/* === 大目標（絶対目標・ツリーには入れず別格でデカく） === */}
-      {visionNode && (
-        <section className="mt-10">
+      {/* === 大目標ごと（絶対目標は別格の見出し。配下だけツリーで編集できる） === */}
+      {visionNodes.map((vision) => (
+        <section key={vision.id} className="mt-10">
           <hr className="border-zinc-200" />
-          <button
-            onClick={() => navigate(`/goals/${visionNode.id}`)}
-            className="block w-full py-5 text-left"
-          >
+          <button onClick={() => navigate(`/goals/${vision.id}`)} className="block w-full py-5 text-left">
             <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-amber-600">
               <Compass className="h-4 w-4" /> 大目標
             </div>
-            <div className="mt-1 text-2xl font-bold text-zinc-900 sm:text-3xl">{visionNode.title}</div>
+            <div className="mt-1 text-2xl font-bold text-zinc-900 sm:text-3xl">{vision.title}</div>
           </button>
           <hr className="border-zinc-200" />
+
+          {/* この大目標の配下（スキルツリー） */}
+          <div className="mt-4">
+            <GoalTree
+              tree={vision.children ?? []}
+              users={users}
+              onToggleTask={handleToggleTreeTask}
+              onAddTask={addGoalTask}
+              onAddGoal={createGoal}
+              onAssignOwner={assignOwner}
+              onOpenTask={(node) => setOpenTaskId(node.id)}
+              onDeleteGoal={deleteGoal}
+              canEditGoals={canEditGoals}
+            />
+
+            {/* この大目標にゴールを追加（owner/admin のみ） */}
+            {canEditGoals && (
+              <div className="mt-1 flex items-center gap-3 rounded-lg py-2 pl-7 pr-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                  <Plus className="h-4 w-4" />
+                </span>
+                <input
+                  value={addingGoalFor === vision.id ? goalText : ''}
+                  maxLength={GOAL_MAX}
+                  onFocus={() => setAddingGoalFor(vision.id)}
+                  onChange={(e) => setGoalText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitGoal(vision.id)}
+                  placeholder="この大目標の下に積むゴールを入力して Enter"
+                  className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
+                />
+                {addingGoalFor === vision.id && (
+                  <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      ))}
+
+      {visionNodes.length === 0 && (
+        <section className="mt-10">
+          <hr className="mb-4 border-zinc-200" />
+          <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/40 p-5 text-sm text-zinc-500">
+            まだ大目標がありません。「事業設定」から大目標を追加すると、その下にゴールを積めます。
+          </div>
         </section>
       )}
 
-      {/* === ゴール階層（スキルツリー＝大目標の配下だけ） === */}
-      <section className={visionNode ? 'mt-6' : 'mt-10'}>
-        {!visionNode && <hr className="mb-4 border-zinc-200" />}
-
-        {/* スキルツリー（ゴール階層） */}
-        <GoalTree
-          tree={displayTree}
-          users={users}
-          onToggleTask={handleToggleTreeTask}
-          onAddTask={addGoalTask}
-          onAddGoal={createGoal}
-          onAssignOwner={assignOwner}
-          onOpenTask={(node) => setOpenTaskId(node.id)}
-          onDeleteGoal={deleteGoal}
-          canEditGoals={canEditGoals}
-        />
-
-        {/* ゴール作成の入力行（owner/admin のみ） */}
-        {canEditGoals && (
-          <div className="mt-1 flex items-center gap-3 rounded-lg py-2 pl-7 pr-2">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-white">
-              <Plus className="h-4 w-4" />
-            </span>
-            <input
-              value={goalText}
-              onChange={(e) => setGoalText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submitGoal()}
-              placeholder="達成したいゴールを入力して Enter"
-              className="flex-1 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400"
-            />
-            <MicButton onText={(t) => setGoalText((p) => (p ? p + ' ' : '') + t)} />
-          </div>
-        )}
-      </section>
+      {/* === 大目標に未分類のゴール（旧データの受け皿。消えないよう必ず表示） === */}
+      {orphanNodes.length > 0 && (
+        <section className="mt-10">
+          <hr className="mb-4 border-zinc-200" />
+          <h2 className="mb-2 text-sm font-semibold text-zinc-500">大目標に未分類のゴール</h2>
+          <GoalTree
+            tree={orphanNodes}
+            users={users}
+            onToggleTask={handleToggleTreeTask}
+            onAddTask={addGoalTask}
+            onAddGoal={createGoal}
+            onAssignOwner={assignOwner}
+            onOpenTask={(node) => setOpenTaskId(node.id)}
+            onDeleteGoal={deleteGoal}
+            canEditGoals={canEditGoals}
+          />
+        </section>
+      )}
 
       <TaskDetailModal
         taskId={openTaskId}

@@ -109,13 +109,8 @@ export async function setActiveWorkspace(ctx: Ctx, workspaceId: string): Promise
 export async function getContext(ctx: Ctx) {
   const { data: user } = await ctx.db
     .from('users').select('name,email').eq('id', ctx.userId).maybeSingle()
-  let visionGoal: { id: string; title: string } | null = null
-  if (ctx.visionGoalId) {
-    const { data: v } = await ctx.db
-      .from('goals').select('id,title').eq('id', ctx.visionGoalId).maybeSingle()
-    visionGoal = v ?? null
-  }
-  const manual = await buildManual(ctx, visionGoal)
+  const visionGoals = await loadVisionGoals(ctx)
+  const manual = await buildManual(ctx, visionGoals)
   return {
     user: user?.name,
     email: user?.email,
@@ -123,9 +118,27 @@ export async function getContext(ctx: Ctx) {
       ? { id: ctx.workspaceId, name: ctx.workspaceName, role: ctx.role }
       : null,
     workspaces: ctx.workspaces,
-    visionGoal,
+    // 大目標は複数OK。primary は vision_goal_id（既定の置き場）。
+    visionGoals,
+    visionGoal: visionGoals.find((v) => v.id === ctx.visionGoalId) ?? visionGoals[0] ?? null,
     manual,
   }
+}
+
+// この事業の大目標（is_vision=true）を全部読む。移行前データの保険として
+// 旧・主大目標(vision_goal_id)も拾い、重複は除く。
+async function loadVisionGoals(ctx: Ctx): Promise<Array<{ id: string; title: string }>> {
+  if (!ctx.workspaceId) return []
+  const { data } = await ctx.db
+    .from('goals').select('id,title').eq('workspace_id', ctx.workspaceId).eq('is_vision', true)
+    .order('created_at', { ascending: true })
+  const list = data ?? []
+  if (ctx.visionGoalId && !list.some((v) => v.id === ctx.visionGoalId)) {
+    const { data: legacy } = await ctx.db
+      .from('goals').select('id,title').eq('id', ctx.visionGoalId).maybeSingle()
+    if (legacy) return [legacy, ...list]
+  }
+  return list
 }
 
 const roleJp = (r: string | null) =>
@@ -145,7 +158,7 @@ function asData(s: string | null | undefined): string {
 
 // 現在のWSに即した「取扱説明＋現在地＋今日の状態＋このWSの文脈」を組み立てる。
 // 操作の常時ルール（コーチング姿勢・安全）は mcp.ts の instructions 側に常駐。ここはそれを現在地で具体化する。
-async function buildManual(ctx: Ctx, visionGoal: { id: string; title: string } | null): Promise<string> {
+async function buildManual(ctx: Ctx, visionGoals: Array<{ id: string; title: string }>): Promise<string> {
   const [today, all, activity] = await Promise.all([
     listTasks(ctx, { todayOnly: true }),
     listTasks(ctx),
@@ -162,10 +175,13 @@ async function buildManual(ctx: Ctx, visionGoal: { id: string; title: string } |
     L.push('別の事業を操作するときは set_active_workspace で切り替えてから。WSを跨いで勝手に書かないこと。どの事業の話か曖昧なら必ず確認する。')
   }
 
-  if (visionGoal) {
+  if (visionGoals.length) {
     L.push('')
-    L.push(`【この事業の大目標（絶対目標・ゴール階層の頂点）】${asData(visionGoal.title)}（id: ${visionGoal.id}）`)
-    L.push('すべての提案はこの大目標から逆算する。大目標の下に置きたいゴールは create_goal の parentId にこの id を渡す。')
+    L.push('【この事業の大目標（絶対目標・ゴール階層の頂点）】複数あり得る。各大目標がそれぞれ独立した頂点で、ふだんのゴールはどれかの大目標の配下に積む。')
+    for (const v of visionGoals) {
+      L.push(`・${asData(v.title)}（id: ${v.id}）`)
+    }
+    L.push('すべての提案はいずれかの大目標から逆算する。ゴールを作るときは create_goal の parentId に、ぶら下げたい大目標の id を渡す（どの大目標の下かが曖昧なら確認する）。')
   }
 
   if (ctx.assistantContext) {

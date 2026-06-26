@@ -5,6 +5,7 @@ import {
   ListPlus, GitBranchPlus, Maximize2, Users, X, Trash2, Bot,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { GOAL_MAX } from '../../utils/limits'
 
 // スキルツリー：ゴール/タスクのノードを再帰表示する。
 // 設計方針：タイトルを主役に、装飾は最小限。状態＝左の丸アイコン1つ、
@@ -228,6 +229,7 @@ function Node({ node, users, depth, taskDepth = 0, onToggleTask, onAddTask, onAd
               <input
                 autoFocus
                 value={text}
+                maxLength={addMode === 'goal' ? GOAL_MAX : undefined}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && submitAdd()}
                 onBlur={submitAdd}

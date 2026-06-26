@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../utils/supabaseClient'
 import { useWorkspace } from './useWorkspace'
+import { GOAL_MAX, clamp } from '../utils/limits'
 
 // ゴールを Supabase から取得し、現在のワークスペースに絞る。
 // goals: 全ゴール / topGoals: 最上位（parent_id なし）＝「今やるべきゴール」。
@@ -29,7 +30,7 @@ export function useGoals() {
 
   // ゴールを作成（parentId 指定で配下に）。親未指定なら大目標(北極星)の下にぶら下げる＝頂点構造を維持（設計A）。
   const createGoal = async (title, parentId = null) => {
-    const text = title.trim()
+    const text = clamp(title.trim(), GOAL_MAX)
     if (!text || !currentId) return null
     const parent = parentId ?? current?.visionGoalId ?? null
     const { data } = await supabase

@@ -22,6 +22,7 @@ import { useDeliverables } from '../../hooks/useDeliverables'
 import { useGoalTasks } from '../../hooks/useGoalTasks'
 import { supabase } from '../../utils/supabaseClient'
 import { cn } from '../../utils/cn'
+import { GOAL_MAX } from '../../utils/limits'
 import CommentThread from '../comments/CommentThread'
 import TaskDetailModal from '../tasks/TaskDetailModal'
 import TaskMeta from '../tasks/TaskMeta'
@@ -34,6 +35,8 @@ export default function GoalDetailPage() {
   const { goal, loading, saveGoal, deleteGoal } = useGoal(goalId)
   const { current, currentId, user } = useWorkspace()
   const canEdit = ['owner', 'admin'].includes(current?.role)
+  // 大目標（is_vision）かどうか。大目標の名前は事業設定からのみ変更できる。
+  const isVisionGoal = !!goal && (goal.is_vision || goal.id === current?.visionGoalId)
   const { items, available, busy, upload, addLink, open: openItem, remove } = useDeliverables(goalId)
   const { tasks, addTask, toggleTask, deleteTask, reload: reloadTasks } = useGoalTasks(goalId)
 
@@ -210,15 +213,21 @@ export default function GoalDetailPage() {
 
           {/* ゴール情報 */}
           <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
-            <InfoField label="ゴール名">
-              {canEdit ? (
+            <InfoField label={isVisionGoal ? '大目標名' : 'ゴール名'}>
+              {canEdit && !isVisionGoal ? (
                 <input
                   value={info.title}
+                  maxLength={GOAL_MAX}
                   onChange={(e) => setInfo((p) => ({ ...p, title: e.target.value }))}
                   className={inputCls}
                 />
               ) : (
-                <ReadVal v={goal.title} />
+                <>
+                  <ReadVal v={goal.title} />
+                  {isVisionGoal && canEdit && (
+                    <p className="mt-1 text-xs text-zinc-400">大目標の名前は「事業設定」から変更できます。</p>
+                  )}
+                </>
               )}
             </InfoField>
             <div className="grid gap-4 sm:grid-cols-2">

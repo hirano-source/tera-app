@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Target, Trash2, Check, ExternalLink, Plus, Image as ImageIcon } from 'lucide-react'
+import { X, Target, Trash2, ExternalLink, Plus, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../utils/supabaseClient'
 import { useWorkspace } from '../../hooks/useWorkspace'
+import { VISION_MAX, clamp } from '../../utils/limits'
 
 // 事業設定（左上ロゴ／事業ドロップダウンから開く）。
 // 事業の大目標（北極星）・事業名の変更・事業の削除を1か所に集約。
@@ -13,11 +14,32 @@ export default function BusinessSettingsModal({ open, onClose }) {
   const canEdit = ['owner', 'admin'].includes(current?.role)
   const isOwner = current?.role === 'owner'
   const [name, setName] = useState('')
-  const [vision, setVision] = useState(null) // {id,title} | null
+  const [visions, setVisions] = useState([]) // [{id,title}] 大目標は複数OK
   const [newVision, setNewVision] = useState('')
   const [ctxText, setCtxText] = useState('')
   const [busy, setBusy] = useState(false)
   const logoRef = useRef(null)
+
+  // この事業の大目標（is_vision=true）を全部読む。移行前データの保険として
+  // 旧・主大目標(vision_goal_id)も拾い、重複は除く。
+  const loadVisions = async () => {
+    const { data } = await supabase
+      .from('goals')
+      .select('id,title')
+      .eq('workspace_id', currentId)
+      .eq('is_vision', true)
+      .order('created_at', { ascending: true })
+    let list = data ?? []
+    if (current?.visionGoalId && !list.some((v) => v.id === current.visionGoalId)) {
+      const { data: legacy } = await supabase
+        .from('goals')
+        .select('id,title')
+        .eq('id', current.visionGoalId)
+        .maybeSingle()
+      if (legacy) list = [legacy, ...list]
+    }
+    setVisions(list)
+  }
 
   const onPickLogo = async (e) => {
     const f = e.target.files?.[0]
@@ -37,22 +59,8 @@ export default function BusinessSettingsModal({ open, onClose }) {
     if (!open || !current) return
     setName(current.name ?? '')
     setCtxText(current.assistantContext ?? '')
-    let active = true
-    if (current.visionGoalId) {
-      supabase
-        .from('goals')
-        .select('id,title')
-        .eq('id', current.visionGoalId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (active) setVision(data)
-        })
-    } else {
-      setVision(null)
-    }
-    return () => {
-      active = false
-    }
+    loadVisions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, current])
 
   if (!open || !current) return null
@@ -70,43 +78,55 @@ export default function BusinessSettingsModal({ open, onClose }) {
     }
   }
 
-  const createVision = async () => {
-    const t = newVision.trim()
+  // 大目標を1つ追加（複数OK）。最初の1つは「主大目標」(vision_goal_id)にも設定し、
+  // ゴール追加時の既定の置き場・MCP連携の起点にする。
+  const addVision = async () => {
+    const t = clamp(newVision.trim(), VISION_MAX)
     if (!t) return
     setBusy(true)
     try {
       const { data, error } = await supabase
         .from('goals')
-        .insert({ workspace_id: currentId, owner_id: user?.id ?? null, title: t, progress: 0 })
+        .insert({ workspace_id: currentId, owner_id: user?.id ?? null, title: t, progress: 0, is_vision: true, parent_id: null })
         .select('id,title')
         .single()
       if (error) throw error
-      await setVisionGoal(currentId, data.id)
-      setVision(data)
+      if (visions.length === 0) await setVisionGoal(currentId, data.id)
       setNewVision('')
+      await loadVisions()
     } catch (e) {
-      alert('大目標の設定に失敗しました: ' + (e?.message ?? e))
+      alert('大目標の追加に失敗しました: ' + (e?.message ?? e))
     } finally {
       setBusy(false)
     }
   }
 
-  const saveVisionTitle = async () => {
-    const t = (vision?.title || '').trim()
-    if (!t || !vision) return
-    await supabase.from('goals').update({ title: t }).eq('id', vision.id)
+  const renameVision = async (id, title) => {
+    const t = clamp(title.trim(), VISION_MAX)
+    if (!t) return
+    await supabase.from('goals').update({ title: t }).eq('id', id)
   }
 
-  const achieveVision = async () => {
-    if (!vision) return
-    if (!confirm(`大目標「${vision.title}」を達成済みにして、新しい大目標を設定できるようにします。よろしいですか？`)) return
+  // 大目標を削除。配下のゴール・成果物・チャットも cascade で消える（要確認）。
+  // 削除したのが主大目標なら、残りの先頭を主大目標に繰り上げる（無ければ解除）。
+  const deleteVision = async (v) => {
+    if (
+      !confirm(
+        `大目標「${v.title}」を削除しますか？\nこの大目標の下のゴール・タスク・成果物・チャットもすべて削除され、元に戻せません。`,
+      )
+    )
+      return
     setBusy(true)
     try {
-      await supabase.from('goals').update({ status: 'done' }).eq('id', vision.id)
-      await setVisionGoal(currentId, null)
-      setVision(null)
+      const { error } = await supabase.from('goals').delete().eq('id', v.id)
+      if (error) throw error
+      if (current?.visionGoalId === v.id) {
+        const next = visions.find((x) => x.id !== v.id)
+        await setVisionGoal(currentId, next?.id ?? null)
+      }
+      await loadVisions()
     } catch (e) {
-      alert('失敗しました: ' + (e?.message ?? e))
+      alert('削除に失敗しました: ' + (e?.message ?? e))
     } finally {
       setBusy(false)
     }
@@ -208,67 +228,75 @@ export default function BusinessSettingsModal({ open, onClose }) {
             <p className="mt-1.5 text-xs text-zinc-400">左上やヘッダーに表示されます（PNG/SVG等の画像）。</p>
           </section>
 
-          {/* 大目標 */}
+          {/* 大目標（複数OK・ここでのみ追加/変更/削除できる） */}
           <section>
             <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-zinc-500">
               <Target className="h-3.5 w-3.5" /> 事業の大目標
             </label>
-            {vision ? (
-              <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
-                {canEdit ? (
-                  <input
-                    value={vision.title}
-                    onChange={(e) => setVision((v) => ({ ...v, title: e.target.value }))}
-                    onBlur={saveVisionTitle}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                    className="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-800 outline-none focus:border-zinc-500"
-                  />
-                ) : (
-                  <p className="font-medium text-zinc-800">{vision.title}</p>
-                )}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
-                      navigate(`/goals/${vision.id}`)
-                      onClose()
-                    }}
-                    className="flex items-center gap-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
-                  >
-                    <ExternalLink className="h-4 w-4" /> 開く
-                  </button>
-                  {canEdit && (
-                    <button
-                      onClick={achieveVision}
-                      disabled={busy}
-                      className="flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"
-                    >
-                      <Check className="h-4 w-4" /> 達成して新しく設定
-                    </button>
-                  )}
-                </div>
+
+            {visions.length > 0 ? (
+              <div className="space-y-2">
+                {visions.map((v) => (
+                  <div key={v.id} className="rounded-lg border border-brand/30 bg-brand/5 p-3">
+                    {canEdit ? (
+                      <input
+                        defaultValue={v.title}
+                        maxLength={VISION_MAX}
+                        onBlur={(e) => renameVision(v.id, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        className="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-800 outline-none focus:border-zinc-500"
+                      />
+                    ) : (
+                      <p className="font-medium text-zinc-800">{v.title}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          navigate(`/goals/${v.id}`)
+                          onClose()
+                        }}
+                        className="flex items-center gap-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
+                      >
+                        <ExternalLink className="h-4 w-4" /> 開く
+                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => deleteVision(v)}
+                          disabled={busy}
+                          className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 disabled:opacity-40"
+                        >
+                          <Trash2 className="h-4 w-4" /> 削除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : canEdit ? (
-              <div className="flex gap-2">
+            ) : (
+              <p className="text-sm text-zinc-400">まだ大目標がありません。{canEdit ? '下の欄から追加してください。' : ''}</p>
+            )}
+
+            {canEdit && (
+              <div className="mt-2 flex gap-2">
                 <input
                   value={newVision}
                   onChange={(e) => setNewVision(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && createVision()}
+                  onKeyDown={(e) => e.key === 'Enter' && addVision()}
+                  maxLength={VISION_MAX}
                   placeholder="例：3年で日本一のゴルフスクールになる"
                   className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 />
                 <button
-                  onClick={createVision}
+                  onClick={addVision}
                   disabled={busy || !newVision.trim()}
                   className="flex items-center gap-1 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
                 >
-                  <Plus className="h-4 w-4" /> 設定
+                  <Plus className="h-4 w-4" /> 追加
                 </button>
               </div>
-            ) : (
-              <p className="text-sm text-zinc-400">未設定</p>
             )}
             <p className="mt-1.5 text-xs text-zinc-400">
-              この事業の一番大きな目標。ふだんのゴールはこの下に積み上げます。「開く」で理想／現状／差まで書けます。
+              この事業の大きな目標。複数立てられます。ふだんのゴールは各大目標の下に積み上げます（最大{VISION_MAX}字）。
             </p>
           </section>
 
