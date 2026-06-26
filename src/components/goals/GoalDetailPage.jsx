@@ -61,6 +61,9 @@ export default function GoalDetailPage() {
   const [crumbs, setCrumbs] = useState([])
   const [showMove, setShowMove] = useState(false)
   const [crumbBump, setCrumbBump] = useState(0) // 移動後にパンくずを引き直す
+  const [activeTab, setActiveTab] = useState('content') // content | chat | tasks
+  const [openFields, setOpenFields] = useState({}) // 中身4項目の開閉
+  const toggleField = (k) => setOpenFields((p) => ({ ...p, [k]: !p[k] }))
 
   useEffect(() => {
     if (!goal) return
@@ -157,6 +160,11 @@ export default function GoalDetailPage() {
   }, [items, q, asc])
 
   const doneCount = tasks.filter((t) => t.status === 'done').length
+  const TABS = [
+    { v: 'content', label: '中身' },
+    { v: 'chat', label: 'チャット' },
+    { v: 'tasks', label: tasks.length ? `タスク ${doneCount}/${tasks.length}` : 'タスク' },
+  ]
   // 状態順（詰まり→進行中→未着手→完了）に並べ替えて表示する
   const sortedTasks = [...tasks].sort((a, b) => (TASK_ORDER[a.status] ?? 2) - (TASK_ORDER[b.status] ?? 2))
   // レーン：手動 phase を優先、無ければ自動判定
@@ -210,8 +218,8 @@ export default function GoalDetailPage() {
   }
 
   return (
-    <div className="flex h-full flex-col lg:flex-row">
-      {/* 左：内容（スクロール） */}
+    <div className="flex h-full flex-col">
+      {/* 内容（スクロール） */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[920px] px-4 py-5 sm:px-8">
           {/* パンくず */}
@@ -232,10 +240,17 @@ export default function GoalDetailPage() {
             </nav>
           )}
 
-          {/* タイトル */}
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-6 py-8 text-center">
-            <h1 className="text-2xl font-bold tracking-wide sm:text-3xl">{goal.title}</h1>
-          </div>
+          {/* タイトル（編集可・1行＝高さを節約） */}
+          {canEdit ? (
+            <input
+              value={info.title}
+              maxLength={GOAL_MAX}
+              onChange={(e) => setInfo((p) => ({ ...p, title: e.target.value }))}
+              className="w-full rounded-lg border border-transparent px-1.5 py-1 text-2xl font-bold tracking-wide outline-none hover:border-zinc-200 focus:border-zinc-300"
+            />
+          ) : (
+            <h1 className="px-1.5 text-2xl font-bold tracking-wide">{goal.title}</h1>
+          )}
 
           {/* レーン（今ここ / 次 / あとで）。未設定は自動判定の値を初期表示。 */}
           <div className="mt-3 flex items-center gap-2">
@@ -262,99 +277,84 @@ export default function GoalDetailPage() {
             {!goal.phase && <span className="text-[11px] text-zinc-400">（自動判定）</span>}
           </div>
 
-          {/* ゴール情報 */}
-          <section className="mt-4 space-y-4 rounded-2xl border border-zinc-200 p-5">
-            <InfoField label={isVisionGoal ? '大目標名' : 'ゴール名'}>
-              {canEdit && !isVisionGoal ? (
-                <input
-                  value={info.title}
-                  maxLength={GOAL_MAX}
-                  onChange={(e) => setInfo((p) => ({ ...p, title: e.target.value }))}
-                  className={inputCls}
-                />
-              ) : (
-                <>
-                  <ReadVal v={goal.title} />
-                  {isVisionGoal && canEdit && (
-                    <p className="mt-1 text-xs text-zinc-400">大目標の名前は「事業設定」から変更できます。</p>
+          {/* タブ：中身 / チャット / タスク（チャットは本文に出さずタブ内だけ） */}
+          <div className="mt-4 flex gap-1 border-b border-zinc-200">
+            {TABS.map((t) => (
+              <button
+                key={t.v}
+                onClick={() => setActiveTab(t.v)}
+                className={cn(
+                  'relative px-4 py-2 text-sm font-medium',
+                  activeTab === t.v ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600',
+                )}
+              >
+                {t.label}
+                {activeTab === t.v && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-zinc-900" />}
+              </button>
+            ))}
+          </div>
+
+          {/* === 中身タブ：期日/担当（1行）＋ 4項目アコーディオン === */}
+          {activeTab === 'content' && (
+            <section className="mt-4 space-y-2">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-sm">
+                <label className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500">期日</span>
+                  {canEdit ? (
+                    <input type="date" value={info.due_date || ''} onChange={(e) => setInfo((p) => ({ ...p, due_date: e.target.value }))} className="rounded-lg border border-zinc-300 px-2 py-1 text-sm outline-none focus:border-zinc-500" />
+                  ) : (
+                    <span className="text-zinc-700">{goal.due_date || '—'}</span>
                   )}
-                </>
-              )}
-            </InfoField>
-            {/* 理想 → 現状 → その差 の流れ。「差＝埋めるところ」を一番目立たせる。 */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <InfoField label="◎ 理想の状態">
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500">担当</span>
+                  {canEdit ? (
+                    <select value={info.owner_id || ''} onChange={(e) => setInfo((p) => ({ ...p, owner_id: e.target.value }))} className="rounded-lg border border-zinc-300 px-2 py-1 text-sm outline-none focus:border-zinc-500">
+                      <option value="">未割当</option>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-zinc-700">{members.find((m) => m.id === goal.owner_id)?.name || '—'}</span>
+                  )}
+                </label>
+              </div>
+
+              <CollapsibleField label="◎ 理想の状態" value={info.ideal_state} open={!!openFields.ideal} onToggle={() => toggleField('ideal')}>
                 {canEdit ? (
                   <AutoTextarea value={info.ideal_state} onChange={(e) => setInfo((p) => ({ ...p, ideal_state: e.target.value }))} placeholder="達成したらどうなっているか" className={taCls} />
                 ) : (
                   <ReadVal v={goal.ideal_state} />
                 )}
-              </InfoField>
-              <InfoField label="● 現状">
+              </CollapsibleField>
+              <CollapsibleField label="● 現状" value={info.current} open={!!openFields.current} onToggle={() => toggleField('current')}>
                 {canEdit ? (
                   <AutoTextarea value={info.current} onChange={(e) => setInfo((p) => ({ ...p, current: e.target.value }))} placeholder="今どういう状態か" className={taCls} />
                 ) : (
                   <ReadVal v={goal.current} />
                 )}
-              </InfoField>
-            </div>
-
-            {/* その差（埋めるところ）＝枠＋テラコッタで強調 */}
-            <div className="rounded-xl border border-terracotta/40 bg-terracotta/5 p-3">
-              <span className="mb-1 block text-xs font-semibold text-terracotta">その差（埋めるところ）</span>
-              {canEdit ? (
-                <AutoTextarea value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ・足りないもの＝ここを埋める" className={taCls} />
-              ) : (
-                <ReadVal v={goal.gap} />
-              )}
-            </div>
-
-            <InfoField label="✓ 完了の基準">
-              {canEdit ? (
-                <AutoTextarea value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か（1行＝1チェックの体裁で書くと分かりやすい）" className={taCls} />
-              ) : goal.criteria ? (
-                <ul className="space-y-1">
-                  {String(goal.criteria).split(/\n|。/).map((s) => s.trim()).filter(Boolean).map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-700">
-                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-zinc-300 text-zinc-300">☐</span>
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <ReadVal v={null} />
-              )}
-            </InfoField>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <InfoField label="期日">
+              </CollapsibleField>
+              <CollapsibleField label="その差（埋めるところ）" accent value={info.gap} open={!!openFields.gap} onToggle={() => toggleField('gap')}>
                 {canEdit ? (
-                  <input type="date" value={info.due_date || ''} onChange={(e) => setInfo((p) => ({ ...p, due_date: e.target.value }))} className={inputCls} />
+                  <AutoTextarea value={info.gap} onChange={(e) => setInfo((p) => ({ ...p, gap: e.target.value }))} placeholder="理想と現状のギャップ＝ここを埋める" className={taCls} />
                 ) : (
-                  <ReadVal v={goal.due_date} />
+                  <ReadVal v={goal.gap} />
                 )}
-              </InfoField>
-              <InfoField label="担当">
+              </CollapsibleField>
+              <CollapsibleField label="✓ 完了の基準" value={info.criteria} open={!!openFields.criteria} onToggle={() => toggleField('criteria')}>
                 {canEdit ? (
-                  <select value={info.owner_id || ''} onChange={(e) => setInfo((p) => ({ ...p, owner_id: e.target.value }))} className={inputCls}>
-                    <option value="">未割当</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
+                  <AutoTextarea value={info.criteria} onChange={(e) => setInfo((p) => ({ ...p, criteria: e.target.value }))} placeholder="何ができたら完了か" className={taCls} />
                 ) : (
-                  <ReadVal v={members.find((m) => m.id === goal.owner_id)?.name} />
+                  <ReadVal v={goal.criteria} />
                 )}
-              </InfoField>
-            </div>
-            {canEdit && infoDirty && (
-              <div className="flex justify-end">
-                <button onClick={saveInfo} disabled={savingInfo} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
-                  {savingInfo ? '保存中…' : '保存'}
-                </button>
-              </div>
-            )}
-          </section>
+              </CollapsibleField>
+            </section>
+          )}
 
+          {/* === タスクタブ：タスク＋成果物 === */}
+          {activeTab === 'tasks' && (
+          <>
           {/* タスク */}
           <section className="mt-6">
             <h2 className="flex items-center gap-2 text-lg font-bold">
@@ -536,6 +536,17 @@ export default function GoalDetailPage() {
               )}
             </div>
           </section>
+          </>
+          )}
+
+          {/* === チャットタブ（本文には出さずここだけ） === */}
+          {activeTab === 'chat' && (
+            <section className="mt-4">
+              <div className="h-[70vh] overflow-hidden rounded-xl border border-zinc-200">
+                <CommentThread targetType="goal" targetId={goalId} members={members} className="h-full" />
+              </div>
+            </section>
+          )}
 
           {/* ゴールの移動・削除（owner/admin）。大目標は事業設定でのみ扱うので出さない。 */}
           {canEdit && !isVisionGoal && (
@@ -559,14 +570,20 @@ export default function GoalDetailPage() {
         </div>
       </div>
 
-      {/* 右：常駐チャット（PCは右カラム／スマホは下に積む） */}
-      <aside className="flex max-h-[45vh] shrink-0 flex-col border-t border-zinc-200 lg:max-h-none lg:w-[360px] lg:border-l lg:border-t-0">
-        <div className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 font-bold">
-          <MessageSquare className="h-5 w-5 text-zinc-500" />
-          チャット
+      {/* 下固定の保存バー（中身タブのときだけ。どこからでも押せる） */}
+      {activeTab === 'content' && canEdit && (
+        <div className="shrink-0 border-t border-zinc-200 bg-white px-4 py-3 sm:px-8">
+          <div className="mx-auto flex max-w-[920px] justify-end">
+            <button
+              onClick={saveInfo}
+              disabled={savingInfo || !infoDirty}
+              className="rounded-lg bg-brand px-6 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+            >
+              {savingInfo ? '保存中…' : '保存'}
+            </button>
+          </div>
         </div>
-        <CommentThread targetType="goal" targetId={goalId} members={members} className="flex-1" />
-      </aside>
+      )}
 
       <TaskDetailModal
         taskId={openTaskId}
@@ -629,6 +646,25 @@ function InfoField({ label, children }) {
 
 function ReadVal({ v }) {
   return <p className="whitespace-pre-wrap text-sm text-zinc-700">{v || <span className="text-zinc-400">—</span>}</p>
+}
+
+// 折りたたみ式の項目。畳んだ状態はヘッダーに1行プレビュー、開くとその場で編集。
+function CollapsibleField({ label, value, accent, open, onToggle, children }) {
+  const preview = String(value || '').split('\n')[0].trim()
+  return (
+    <div className={cn('rounded-xl border', accent ? 'border-terracotta/40 bg-terracotta/5' : 'border-zinc-200')}>
+      <button onClick={onToggle} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
+        {open ? <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />}
+        <span className={cn('shrink-0 text-xs font-semibold', accent ? 'text-terracotta' : 'text-zinc-500')}>{label}</span>
+        {!open && (
+          <span className="min-w-0 flex-1 truncate text-sm text-zinc-500">
+            {preview || <span className="text-zinc-300">未記入</span>}
+          </span>
+        )}
+      </button>
+      {open && <div className="px-3 pb-3">{children}</div>}
+    </div>
+  )
 }
 
 function fmt(ts) {
