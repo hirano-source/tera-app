@@ -5,6 +5,8 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import { useGoal } from '../../hooks/useGoals'
 import { useVisionData } from '../../hooks/useVisionData'
 import { formatMetric, daysUntil, PHASE_META } from '../../utils/goalView'
+import CollapsibleField from '../common/CollapsibleField'
+import AutoTextarea from '../common/AutoTextarea'
 import CommentThread from '../comments/CommentThread'
 
 // 大目標トップ＝ダッシュボード。開いた瞬間に「数字・残り日数・全体進捗・今うごかすゴール」が
@@ -227,7 +229,9 @@ function Accordion({ title, open, onToggle, children }) {
   )
 }
 
-// 大目標の理想/現状/差/基準/期日の編集（アコーディオン内）。
+// 大目標の理想/現状/差/基準/期日の編集。各項目は折りたたみ＋自動で伸びる入力
+// （枠内スクロールが無い＝スマホで指が取られない）。ゴール詳細と同じ操作感に統一。
+const taCls = 'block w-full resize-none overflow-hidden rounded-lg border border-zinc-300 px-3 py-2 text-sm leading-relaxed outline-none focus:border-zinc-500'
 function InnerEditor({ goal, canEdit, saveGoal, onSaved }) {
   const [f, setF] = useState({
     ideal_state: goal.ideal_state ?? '',
@@ -237,6 +241,8 @@ function InnerEditor({ goal, canEdit, saveGoal, onSaved }) {
     due_date: goal.due_date ?? '',
   })
   const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState({})
+  const toggle = (k) => setOpen((p) => ({ ...p, [k]: !p[k] }))
   const dirty =
     f.ideal_state !== (goal.ideal_state ?? '') ||
     f.current !== (goal.current ?? '') ||
@@ -255,46 +261,36 @@ function InnerEditor({ goal, canEdit, saveGoal, onSaved }) {
       setBusy(false)
     }
   }
-  const cls = 'block w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500'
-  if (!canEdit) {
-    return (
-      <div className="space-y-3 text-sm">
-        <ReadField label="理想の状態" v={goal.ideal_state} />
-        <ReadField label="現状" v={goal.current} />
-        <ReadField label="その差" v={goal.gap} />
-        <ReadField label="完了の基準" v={goal.criteria} />
-      </div>
-    )
-  }
-  return (
-    <div className="space-y-3">
-      <L label="理想の状態"><textarea rows={2} value={f.ideal_state} onChange={(e) => set('ideal_state', e.target.value)} className={cls} /></L>
-      <L label="現状"><textarea rows={2} value={f.current} onChange={(e) => set('current', e.target.value)} className={cls} /></L>
-      <L label="その差"><textarea rows={2} value={f.gap} onChange={(e) => set('gap', e.target.value)} className={cls} /></L>
-      <L label="完了の基準"><textarea rows={2} value={f.criteria} onChange={(e) => set('criteria', e.target.value)} className={cls} /></L>
-      <L label="期日"><input type="date" value={f.due_date || ''} onChange={(e) => set('due_date', e.target.value)} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500" /></L>
-      <div className="flex justify-end">
-        <button onClick={save} disabled={busy || !dirty} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
-          {busy ? '保存中…' : '保存'}
-        </button>
-      </div>
-    </div>
+  const field = (key, label, accent) => (
+    <CollapsibleField label={label} accent={accent} value={f[key]} open={!!open[key]} onToggle={() => toggle(key)}>
+      {canEdit ? (
+        <AutoTextarea value={f[key]} onChange={(e) => set(key, e.target.value)} placeholder="" className={taCls} />
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-zinc-700">{f[key] || <span className="text-zinc-400">未記入</span>}</p>
+      )}
+    </CollapsibleField>
   )
-}
-
-function L({ label, children }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-zinc-500">{label}</span>
-      {children}
-    </label>
-  )
-}
-function ReadField({ label, v }) {
-  return (
-    <div>
-      <span className="mb-0.5 block text-xs text-zinc-500">{label}</span>
-      <p className="whitespace-pre-wrap text-zinc-700">{v || <span className="text-zinc-400">未記入</span>}</p>
+    <div className="space-y-2">
+      {field('ideal_state', '◎ 理想の状態')}
+      {field('current', '● 現状')}
+      {field('gap', 'その差（埋めるところ）', true)}
+      {field('criteria', '✓ 完了の基準')}
+      <div className="flex items-center gap-2 px-1 pt-1 text-sm">
+        <span className="text-xs text-zinc-500">期日</span>
+        {canEdit ? (
+          <input type="date" value={f.due_date || ''} onChange={(e) => set('due_date', e.target.value)} className="rounded-lg border border-zinc-300 px-2 py-1 text-sm outline-none focus:border-zinc-500" />
+        ) : (
+          <span className="text-zinc-700">{f.due_date || '—'}</span>
+        )}
+      </div>
+      {canEdit && (
+        <div className="flex justify-end pt-1">
+          <button onClick={save} disabled={busy || !dirty} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
+            {busy ? '保存中…' : '保存'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
