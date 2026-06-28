@@ -51,6 +51,16 @@ export default function GoalDetailPage() {
   const [dragOver, setDragOver] = useState(false)
   const [newTask, setNewTask] = useState('')
   const [openTaskId, setOpenTaskId] = useState(null)
+  // 完了レーンの開閉。既定は畳む。次回も維持するため localStorage に記憶。
+  const [doneOpen, setDoneOpen] = useState(() => {
+    try { return localStorage.getItem('savo:goalDoneOpen') === '1' } catch { return false }
+  })
+  const toggleDoneOpen = () =>
+    setDoneOpen((v) => {
+      const next = !v
+      try { localStorage.setItem('savo:goalDoneOpen', next ? '1' : '0') } catch {}
+      return next
+    })
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkName, setLinkName] = useState('')
@@ -168,6 +178,54 @@ export default function GoalDetailPage() {
   ]
   // 状態順（詰まり→進行中→未着手→完了）に並べ替えて表示する
   const sortedTasks = [...tasks].sort((a, b) => (TASK_ORDER[a.status] ?? 2) - (TASK_ORDER[b.status] ?? 2))
+  // 完了は別グループへ。普段は折りたたみ、未完了（active）だけ常時表示する。
+  const activeTasks = sortedTasks.filter((t) => t.status !== 'done')
+  const doneTasks = sortedTasks.filter((t) => t.status === 'done')
+  const renderTaskRow = (t) => (
+    <li
+      key={t.id}
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50',
+        t.status === 'blocked' && 'border border-lantern/30 bg-lantern/5',
+      )}
+    >
+      <button
+        onClick={() => toggleTask(t)}
+        className={cn(
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+          t.status === 'done' ? 'bg-emerald-500 text-white' : t.status === 'blocked' ? 'bg-lantern text-white' : 'bg-brand text-white',
+        )}
+      >
+        {t.status === 'done' ? <Check className="h-3 w-3" strokeWidth={3} /> : <Play className="h-2.5 w-2.5 translate-x-0.5 fill-white" />}
+      </button>
+      <button
+        onClick={() => setOpenTaskId(t.id)}
+        className={cn('min-w-0 flex-1 text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
+      >
+        <span className="block truncate">{t.title}</span>
+        {t.status === 'blocked' && (t.blocker_type || t.blocker_owner) && (
+          <span className="mt-0.5 block truncate text-[11px] font-medium text-lantern">
+            詰まり: {[BLOCKER_JP[t.blocker_type], t.blocker_owner && `${t.blocker_owner}待ち`].filter(Boolean).join('・')}
+          </span>
+        )}
+      </button>
+      <TaskMeta task={t} />
+      <button onClick={() => setOpenTaskId(t.id)} title="詳細" className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
+        <ChevronRight className="h-4 w-4" />
+      </button>
+      {(canEdit || t.assignee_id === user?.id) && (
+        <button
+          onClick={() => {
+            if (confirm(`タスク「${t.title}」を削除しますか？`)) deleteTask(t)
+          }}
+          title="削除"
+          className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+    </li>
+  )
   // レーン：手動 phase を優先、無ければ自動判定
   const currentPhase = goal?.phase || (goal ? derivePhase(goal, tasks) : 'now')
   const setPhase = async (p) => {
@@ -367,52 +425,21 @@ export default function GoalDetailPage() {
               )}
             </h2>
             <ul className="mt-3 space-y-1">
-              {sortedTasks.map((t) => (
-                <li
-                  key={t.id}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50',
-                    t.status === 'blocked' && 'border border-lantern/30 bg-lantern/5',
-                  )}
-                >
-                  <button
-                    onClick={() => toggleTask(t)}
-                    className={cn(
-                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
-                      t.status === 'done' ? 'bg-emerald-500 text-white' : t.status === 'blocked' ? 'bg-lantern text-white' : 'bg-brand text-white',
-                    )}
-                  >
-                    {t.status === 'done' ? <Check className="h-3 w-3" strokeWidth={3} /> : <Play className="h-2.5 w-2.5 translate-x-0.5 fill-white" />}
-                  </button>
-                  <button
-                    onClick={() => setOpenTaskId(t.id)}
-                    className={cn('min-w-0 flex-1 text-left text-sm', t.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')}
-                  >
-                    <span className="block truncate">{t.title}</span>
-                    {t.status === 'blocked' && (t.blocker_type || t.blocker_owner) && (
-                      <span className="mt-0.5 block truncate text-[11px] font-medium text-lantern">
-                        詰まり: {[BLOCKER_JP[t.blocker_type], t.blocker_owner && `${t.blocker_owner}待ち`].filter(Boolean).join('・')}
-                      </span>
-                    )}
-                  </button>
-                  <TaskMeta task={t} />
-                  <button onClick={() => setOpenTaskId(t.id)} title="詳細" className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                  {(canEdit || t.assignee_id === user?.id) && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`タスク「${t.title}」を削除しますか？`)) deleteTask(t)
-                      }}
-                      title="削除"
-                      className="shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </li>
-              ))}
+              {activeTasks.map(renderTaskRow)}
             </ul>
+            {doneCount > 0 && (
+              <div className="mt-2">
+                <button
+                  onClick={toggleDoneOpen}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50"
+                >
+                  {doneOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <Check className="h-4 w-4 text-emerald-500" strokeWidth={3} />
+                  <span>完了 ({doneCount})</span>
+                </button>
+                {doneOpen && <ul className="mt-1 space-y-1">{doneTasks.map(renderTaskRow)}</ul>}
+              </div>
+            )}
             <div className="mt-1 flex items-center gap-3 rounded-lg px-2 py-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-zinc-300 text-zinc-300">
                 <Plus className="h-3.5 w-3.5" />
