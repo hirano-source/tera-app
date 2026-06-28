@@ -252,14 +252,16 @@ function userDataOf(name: string, data: unknown): string {
 }
 function scanThreats(text: string): string | null {
   // 誤検知を抑えるため「共起」でのみ発火する。単独の外部URLや単独の「トークン」「再認証」
-  // 言及（正規データに普通にある）では鳴らさない。危険なのは“URLや再認証と、送信/認証情報が結びつく”形。
+  // 言及（正規データに普通にある）では鳴らさない。危険なのは“認証情報と送出が結びつく”形・
+  // “再認証と外部送出が結びつく”形・“指示上書き”の3つに絞る。
+  // ※以前は「外部URL＋送信/認証語」だけでも鳴らしていたが、URLを含む通常の業務メモで
+  //   頻繁に誤発火していたため撤去した（本物の認証情報窃取は下の2ルールが捕捉する）。
   const url = hasExternalUrl(text)
   const send = RE_SEND.test(text)
   const cred = RE_CRED.test(text)
   const hits = new Set<string>()
   if (RE_OVERRIDE.test(text)) hits.add('指示上書きの試み')
   if (cred && send) hits.add('認証情報の送出誘導')
-  if (url && (send || cred)) hits.add('外部送信の疑い')
   if (RE_REAUTH.test(text) && (url || send || cred)) hits.add('再認証フィッシングの疑い')
   if (!hits.size) return null
   return [
