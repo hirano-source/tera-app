@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Check, Trash2, Compass } from 'lucide-react'
+import { Plus, Check, Trash2, Compass, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTodayTodo } from '../../hooks/useTodayTodo'
 import { useGoalTree } from '../../hooks/useGoalTree'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -31,6 +31,16 @@ export default function TodayTodoPage() {
   const [addingGoalFor, setAddingGoalFor] = useState(null) // 入力中の大目標id
   const [openTaskId, setOpenTaskId] = useState(null)
   const [moveItem, setMoveItem] = useState(null) // 移動中のゴール/タスク
+  // 完了レーンの開閉。既定は畳む。次回も維持するため localStorage に記憶。
+  const [doneOpen, setDoneOpen] = useState(() => {
+    try { return localStorage.getItem('savo:todoDoneOpen') === '1' } catch { return false }
+  })
+  const toggleDoneOpen = () =>
+    setDoneOpen((v) => {
+      const next = !v
+      try { localStorage.setItem('savo:todoDoneOpen', next ? '1' : '0') } catch {}
+      return next
+    })
   const navigate = useNavigate()
 
   // 大目標（is_vision）は複数。絶対目標なのでツリーには入れず別格の見出しにし、
@@ -66,6 +76,50 @@ export default function TodayTodoPage() {
     setAddingGoalFor(null)
   }
 
+  // 完了は別グループへ。未完了（active）だけ常時表示し、完了は折りたたみに回す。
+  const activeTodos = todos.filter((t) => t.status !== 'done')
+  const doneTodos = todos.filter((t) => t.status === 'done')
+  const renderTodoRow = (todo) => (
+    <li
+      key={todo.id}
+      className="group flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-zinc-50"
+    >
+      {/* 優先度＝左の色帯（ツリーと統一） */}
+      <span className={'h-6 w-1 shrink-0 rounded-full ' + (PRIORITY_ACCENT[todo.priority] ?? 'bg-transparent')} />
+      <button
+        onClick={() => handleToggleTodo(todo)}
+        className={
+          todo.status === 'done'
+            ? 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white'
+            : 'h-5 w-5 shrink-0 rounded-md border-2 border-zinc-300 hover:border-emerald-400'
+        }
+      >
+        {todo.status === 'done' && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+      </button>
+      <button
+        onClick={() => setOpenTaskId(todo.id)}
+        className={
+          'min-w-0 flex-1 truncate text-left text-[15px] font-medium ' +
+          (todo.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')
+        }
+      >
+        {todo.title}
+      </button>
+      <DueDate date={todo.due_date} done={todo.status === 'done'} />
+      {(canEditGoals || todo.assignee_id === user?.id) && (
+        <button
+          onClick={() => {
+            if (confirm(`タスク「${todo.title}」を削除しますか？`)) handleDeleteTodo(todo)
+          }}
+          title="削除"
+          className="hidden shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500 group-hover:block"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+    </li>
+  )
+
   return (
     <div className="relative mx-auto max-w-[1280px] px-4 py-6 sm:px-10 sm:py-8">
       {/* === 今日のToDo === */}
@@ -85,49 +139,22 @@ export default function TodayTodoPage() {
         <hr className="my-4 border-zinc-200" />
 
         {/* 今日のToDo（Supabaseの実データ。クリックで完了切替）*/}
-        {todos.length > 0 && (
-          <ul className="mb-3 space-y-1">
-            {todos.map((todo) => (
-              <li
-                key={todo.id}
-                className="group flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-zinc-50"
-              >
-                {/* 優先度＝左の色帯（ツリーと統一） */}
-                <span className={'h-6 w-1 shrink-0 rounded-full ' + (PRIORITY_ACCENT[todo.priority] ?? 'bg-transparent')} />
-                <button
-                  onClick={() => handleToggleTodo(todo)}
-                  className={
-                    todo.status === 'done'
-                      ? 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white'
-                      : 'h-5 w-5 shrink-0 rounded-md border-2 border-zinc-300 hover:border-emerald-400'
-                  }
-                >
-                  {todo.status === 'done' && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                </button>
-                <button
-                  onClick={() => setOpenTaskId(todo.id)}
-                  className={
-                    'min-w-0 flex-1 truncate text-left text-[15px] font-medium ' +
-                    (todo.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-700')
-                  }
-                >
-                  {todo.title}
-                </button>
-                <DueDate date={todo.due_date} done={todo.status === 'done'} />
-                {(canEditGoals || todo.assignee_id === user?.id) && (
-                  <button
-                    onClick={() => {
-                      if (confirm(`タスク「${todo.title}」を削除しますか？`)) handleDeleteTodo(todo)
-                    }}
-                    title="削除"
-                    className="hidden shrink-0 rounded-md p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500 group-hover:block"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
+        {/* 未完了は常時表示、完了は「✓ 完了 (N)」で畳む（既定は折りたたみ） */}
+        {activeTodos.length > 0 && (
+          <ul className="mb-3 space-y-1">{activeTodos.map(renderTodoRow)}</ul>
+        )}
+        {doneTodos.length > 0 && (
+          <div className="mb-3">
+            <button
+              onClick={toggleDoneOpen}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50"
+            >
+              {doneOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <Check className="h-4 w-4 text-emerald-500" strokeWidth={3} />
+              <span>完了 ({doneTodos.length})</span>
+            </button>
+            {doneOpen && <ul className="mt-1 space-y-1">{doneTodos.map(renderTodoRow)}</ul>}
+          </div>
         )}
 
         {/* タスク追加の入力 */}
