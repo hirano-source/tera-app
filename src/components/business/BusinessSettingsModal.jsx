@@ -330,7 +330,7 @@ export default function BusinessSettingsModal({ open, onClose }) {
               <p className="text-sm text-zinc-400">未設定</p>
             )}
             <p className="mt-1.5 text-xs text-zinc-400">
-              スマホ／PCのClaudeにTERAを繋ぐと、ここに書いた文脈を理解した状態で「次に何をすべきか」を提案します。
+              スマホ／PCのClaudeにSavoを繋ぐと、ここに書いた文脈を理解した状態で「次に何をすべきか」を提案します。
             </p>
           </section>
 

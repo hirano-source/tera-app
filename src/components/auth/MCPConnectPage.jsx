@@ -70,7 +70,7 @@ export default function MCPConnectPage() {
   if (!session) {
     return (
       <Shell>
-        <p className="mb-5 text-sm text-zinc-400">Claude に接続するため、TERA にログインしてください。</p>
+        <p className="mb-5 text-sm text-zinc-400">Claude に接続するため、Savo にログインしてください。</p>
         {error && <Err>{error}</Err>}
         <form onSubmit={doLogin} className="space-y-3">
           <Field label="メールアドレス" type="email" value={email} onChange={setEmail} autoFocus />
@@ -88,7 +88,7 @@ export default function MCPConnectPage() {
         <span className="font-semibold text-white">{session.user.email}</span> として接続します。
       </p>
       <p className="mb-5 text-xs leading-relaxed text-zinc-500">
-        許可すると、Claude があなたとして TERA のゴール・タスク・活動記録を読み書きできるようになります（あなたの権限の範囲）。
+        許可すると、Claude があなたとして Savo のゴール・タスク・活動記録を読み書きできるようになります（あなたの権限の範囲）。
       </p>
       {error && <Err>{error}</Err>}
       <Button onClick={approve} disabled={busy}>{busy ? '接続中…' : 'Claude に接続を許可'}</Button>
@@ -101,7 +101,7 @@ function Shell({ children }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-sidebar p-4">
       <div className="w-[340px] rounded-2xl bg-[#1a1b2e] p-8 shadow-2xl">
-        <div className="mb-1 text-2xl font-extrabold tracking-widest text-brand">TERA</div>
+        <div className="mb-1 text-2xl font-extrabold tracking-widest text-brand">Savo</div>
         {children}
       </div>
     </div>

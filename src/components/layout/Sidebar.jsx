@@ -3,7 +3,6 @@ import { NAV_ITEMS } from '../../utils/navigation'
 import { cn } from '../../utils/cn'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../hooks/useWorkspace'
-import teraSymbol from '../../assets/TERA_Symbol_Nega.png'
 
 // 左サイドバー（ダーク）。ロゴ・ナビアイコン・ユーザーアバターを縦に並べる。
 // データは props で受け取り、描画に徹する。
@@ -23,7 +22,7 @@ export default function Sidebar({ user, badges, onOpenBusiness }) {
             <img src={current.logoUrl} alt="" className="h-full w-full object-contain" />
           </span>
         ) : (
-          <img src={teraSymbol} alt="TERA" className="w-12 object-contain" />
+          <span className="text-lg font-extrabold tracking-wide text-white">Savo</span>
         )}
       </button>
 

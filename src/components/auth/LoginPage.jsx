@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import teraLogo from '../../assets/TERA_Standard_Posi.png'
 
 // ログイン / サインアップ画面。Supabase Auth を使う。
 export default function LoginPage() {
@@ -32,7 +31,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-sidebar p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
         <div className="mb-8 mt-2 flex flex-col items-center gap-4">
-          <img src={teraLogo} alt="TERA" className="w-44" />
+          <div className="text-4xl font-extrabold tracking-[0.2em] text-brand">Savo</div>
           <p className="text-sm text-zinc-500">
             {mode === 'login' ? 'ログイン' : '新規登録'}
           </p>
