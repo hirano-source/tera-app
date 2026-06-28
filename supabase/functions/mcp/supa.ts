@@ -192,11 +192,28 @@ async function buildManual(ctx: Ctx, visionGoals: Array<{ id: string; title: str
 
   L.push('')
   L.push('【今日の状態】')
-  L.push(
-    today.length
-      ? `今日のToDo（${today.length}件）: ${today.map((t) => asData(t.title)).join(' / ')}`
-      : '今日のToDoは未設定。最重要の一手を一緒に決めて create_task({isToday:true}) で置く。',
-  )
+  // 今日のToDoは「未完了だけ」を状態付きで列挙し、完了は件数サマリに回す。
+  // サマリーだけで現在地（何が残り何が終わったか）が分かるようにし、list_tasksの引き直しを不要にする。
+  const todayActive = today.filter((t) => t.status !== 'done')
+  const todayDone = today.length - todayActive.length
+  if (todayActive.length) {
+    const rows = todayActive.map((t) => {
+      const tag = t.status === 'blocked' ? '[blocked]' : '[todo]'
+      const bl =
+        t.status === 'blocked'
+          ? `（待ち: ${[t.blocker_type, t.blocker_owner].filter(Boolean).join('/') || '不明'}）`
+          : ''
+      return `${tag} ${asData(t.title)}${bl}`
+    })
+    L.push(`今日の残タスク（${todayActive.length}件）: ${rows.join(' / ')}`)
+  } else {
+    L.push(
+      today.length
+        ? '今日のToDoはすべて完了。次の一手を一緒に決めて create_task({isToday:true}) で置く。'
+        : '今日のToDoは未設定。最重要の一手を一緒に決めて create_task({isToday:true}) で置く。',
+    )
+  }
+  if (todayDone) L.push(`今日完了: ${todayDone}件`)
   if (blocked.length) {
     L.push(`詰まっているタスク（${blocked.length}件）: ${blocked.map((t) => asData(t.title)).join(' / ')} — 次の一手を提案して解除を促す。`)
   }
