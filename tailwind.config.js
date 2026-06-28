@@ -7,7 +7,7 @@ export default {
         sidebar: '#1c1c1e',
         topbar: '#1c1c1e',
         claude: '#6d5dfc',
-        brand: '#2563eb',
+        brand: '#C04A2B', // Savoブランド＝テラコッタ（オレンジ系）
         // ゴルおじ酒場の世界観（昭和の大衆酒場・赤提灯）。大目標サーフェスで使う。
         cream: '#F3EEE3',
         ink: '#1A1714',
